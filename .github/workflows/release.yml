@@ -35,6 +35,8 @@ jobs:
 
       - name: Build do frontend web
         run: npm run build --workspace apps/web
+        env:
+          VITE_API_URL: ${{ vars.VITE_API_URL || 'http://localhost:3000' }}
 
       - name: Build e publicação do instalador
         uses: tauri-apps/tauri-action@v0
