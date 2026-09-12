@@ -148,7 +148,9 @@ model Product {
   id           String   @id @default(uuid())
   tenantId     String
   categoryId   String?
+  parentId     String?
   name         String
+  variantName  String?
   sku          String?
   barcode      String?
   price        Decimal  @db.Decimal(10, 2)
@@ -162,12 +164,15 @@ model Product {
 
   tenant    Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   category  Category?  @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  parent    Product?   @relation("ProductVariants", fields: [parentId], references: [id], onDelete: Cascade)
+  variants  Product[]  @relation("ProductVariants")
   saleItems SaleItem[]
   stockMovements StockMovement[]
 
   @@unique([tenantId, barcode])
   @@index([tenantId])
   @@index([tenantId, name])
+  @@index([parentId])
 }
 
 // ---------------------------------------------------------------- Clientes

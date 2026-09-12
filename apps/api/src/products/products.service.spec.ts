@@ -46,6 +46,34 @@ describe('ProductsService', () => {
     );
   });
 
+  describe('list', () => {
+    it('filtra apenas produtos base quando topLevelOnly é informado', async () => {
+      prisma.product.findMany.mockResolvedValue([]);
+      prisma.product.count.mockResolvedValue(0);
+
+      await service.list('tenant-1', { topLevelOnly: true } as never);
+
+      expect(prisma.product.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ parentId: null }),
+        }),
+      );
+    });
+
+    it('filtra pelas variações de um produto específico', async () => {
+      prisma.product.findMany.mockResolvedValue([]);
+      prisma.product.count.mockResolvedValue(0);
+
+      await service.list('tenant-1', { parentId: 'parent-1' } as never);
+
+      expect(prisma.product.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ parentId: 'parent-1' }),
+        }),
+      );
+    });
+  });
+
   describe('create', () => {
     it('rejeita código de barras já usado por outro produto', async () => {
       prisma.product.findFirst.mockResolvedValue({ id: 'existing' });
@@ -104,6 +132,69 @@ describe('ProductsService', () => {
         } as never),
       ).rejects.toThrow(NotFoundException);
     });
+
+    it('rejeita criar uma variação sem informar o nome da variação', async () => {
+      await expect(
+        service.create('tenant-1', {
+          name: 'Camiseta',
+          price: 50,
+          parentId: 'parent-1',
+        } as never),
+      ).rejects.toThrow('Informe o nome da variação');
+    });
+
+    it('rejeita quando o produto base da variação não existe', async () => {
+      prisma.product.findFirst.mockResolvedValue(null); // ensureParent
+
+      await expect(
+        service.create('tenant-1', {
+          name: 'Camiseta',
+          price: 50,
+          parentId: 'parent-inexistente',
+          variantName: 'P / Azul',
+        } as never),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('rejeita quando o produto base já é, ele mesmo, uma variação', async () => {
+      prisma.product.findFirst.mockResolvedValue({
+        id: 'parent-1',
+        parentId: 'avo-1',
+      }); // ensureParent
+
+      await expect(
+        service.create('tenant-1', {
+          name: 'Camiseta',
+          price: 50,
+          parentId: 'parent-1',
+          variantName: 'P / Azul',
+        } as never),
+      ).rejects.toThrow('Uma variação não pode ser filha de outra variação');
+    });
+
+    it('cria a variação vinculada ao produto base', async () => {
+      prisma.product.findFirst.mockResolvedValue({
+        id: 'parent-1',
+        parentId: null,
+      }); // ensureParent
+      prisma.product.create.mockResolvedValue({ id: 'variant-1' });
+
+      await service.create('tenant-1', {
+        name: 'Camiseta',
+        price: 50,
+        parentId: 'parent-1',
+        variantName: '  P / Azul  ',
+      } as never);
+
+      expect(prisma.product.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            parentId: 'parent-1',
+            variantName: 'P / Azul',
+          }),
+        }),
+      );
+    });
   });
 
   describe('update', () => {
@@ -123,6 +214,75 @@ describe('ProductsService', () => {
       await expect(
         service.update('tenant-1', 'inexistente', { name: 'Novo nome' } as never),
       ).rejects.toThrow(NotFoundException);
+    });
+
+    it('rejeita transformar um produto em variação de si mesmo', async () => {
+      prisma.product.findFirst.mockResolvedValue({
+        id: 'p1',
+        tenantId: 'tenant-1',
+        parentId: null,
+      });
+
+      await expect(
+        service.update('tenant-1', 'p1', {
+          parentId: 'p1',
+          variantName: 'X',
+        } as never),
+      ).rejects.toThrow('não pode ser variação de si mesmo');
+    });
+
+    it('rejeita tornar variação um produto que já tem suas próprias variações', async () => {
+      prisma.product.findFirst
+        .mockResolvedValueOnce({ id: 'p1', tenantId: 'tenant-1', parentId: null }) // findOwned
+        .mockResolvedValueOnce({ id: 'p2', parentId: null }); // ensureParent (novo pai)
+      prisma.product.count.mockResolvedValue(2); // p1 já tem 2 variações
+
+      await expect(
+        service.update('tenant-1', 'p1', {
+          parentId: 'p2',
+          variantName: 'X',
+        } as never),
+      ).rejects.toThrow('já tem variações');
+    });
+
+    it('atualiza o nome da variação mantendo o vínculo com o produto base', async () => {
+      prisma.product.findFirst.mockResolvedValue({
+        id: 'v1',
+        tenantId: 'tenant-1',
+        parentId: 'parent-1',
+      });
+      prisma.product.update.mockResolvedValue({ id: 'v1' });
+
+      await service.update('tenant-1', 'v1', {
+        variantName: '  M / Preto  ',
+      } as never);
+
+      expect(prisma.product.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ variantName: 'M / Preto' }),
+        }),
+      );
+    });
+
+    it('limpa o nome da variação ao desvincular o produto do pai', async () => {
+      prisma.product.findFirst.mockResolvedValue({
+        id: 'v1',
+        tenantId: 'tenant-1',
+        parentId: 'parent-1',
+        variantName: 'M / Preto',
+      });
+      prisma.product.update.mockResolvedValue({ id: 'v1' });
+
+      await service.update('tenant-1', 'v1', { parentId: null } as never);
+
+      expect(prisma.product.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            parentId: null,
+            variantName: null,
+          }),
+        }),
+      );
     });
   });
 

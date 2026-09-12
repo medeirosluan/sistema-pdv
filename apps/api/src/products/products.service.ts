@@ -31,6 +31,11 @@ export class ProductsService {
     if (query.active !== undefined) {
       where.active = query.active;
     }
+    if (query.parentId) {
+      where.parentId = query.parentId;
+    } else if (query.topLevelOnly) {
+      where.parentId = null;
+    }
     if (query.search?.trim()) {
       const search = query.search.trim();
       where.OR = [
@@ -43,7 +48,10 @@ export class ProductsService {
     const [items, total] = await Promise.all([
       this.prisma.product.findMany({
         where,
-        include: { category: true },
+        include: {
+          category: true,
+          _count: { select: { variants: true } },
+        },
         orderBy: { [query.sortBy ?? 'name']: query.sortOrder ?? 'asc' },
         skip: (page - 1) * pageSize,
         take: pageSize,
@@ -74,6 +82,9 @@ export class ProductsService {
   async create(tenantId: string, dto: CreateProductDto) {
     await this.ensureCategory(tenantId, dto.categoryId);
     await this.ensureBarcodeAvailable(tenantId, dto.barcode);
+    if (dto.parentId) {
+      await this.ensureParent(tenantId, dto.parentId, dto.variantName);
+    }
 
     const { limits, usage, name } =
       await this.tenantService.getPlanInfo(tenantId);
@@ -96,6 +107,8 @@ export class ProductsService {
         minStock: dto.minStock ?? 0,
         categoryId: dto.categoryId ?? null,
         active: dto.active ?? true,
+        parentId: dto.parentId ?? null,
+        variantName: dto.parentId ? (dto.variantName?.trim() ?? null) : null,
       },
       include: { category: true },
     });
@@ -109,6 +122,30 @@ export class ProductsService {
     }
     if (dto.barcode !== undefined) {
       await this.ensureBarcodeAvailable(tenantId, dto.barcode, product.id);
+    }
+    const nextParentId =
+      dto.parentId !== undefined ? dto.parentId : product.parentId;
+    if (dto.parentId !== undefined && dto.parentId !== product.parentId) {
+      if (dto.parentId === id) {
+        throw new BadRequestException(
+          'Um produto não pode ser variação de si mesmo',
+        );
+      }
+      if (dto.parentId) {
+        await this.ensureParent(
+          tenantId,
+          dto.parentId,
+          dto.variantName ?? product.variantName,
+        );
+        const childCount = await this.prisma.product.count({
+          where: { parentId: id },
+        });
+        if (childCount > 0) {
+          throw new BadRequestException(
+            'Este produto já tem variações e não pode virar uma variação de outro produto',
+          );
+        }
+      }
     }
 
     return this.prisma.product.update({
@@ -124,6 +161,11 @@ export class ProductsService {
         ...(dto.minStock !== undefined && { minStock: dto.minStock }),
         ...(dto.categoryId !== undefined && { categoryId: dto.categoryId }),
         ...(dto.active !== undefined && { active: dto.active }),
+        ...(dto.parentId !== undefined && { parentId: dto.parentId }),
+        ...((dto.variantName !== undefined ||
+          (dto.parentId !== undefined && !dto.parentId)) && {
+          variantName: nextParentId ? dto.variantName?.trim() || null : null,
+        }),
       },
       include: { category: true },
     });
@@ -288,6 +330,29 @@ export class ProductsService {
       throw new NotFoundException('Produto não encontrado');
     }
     return product;
+  }
+
+  private async ensureParent(
+    tenantId: string,
+    parentId: string,
+    variantName?: string | null,
+  ) {
+    if (!variantName?.trim()) {
+      throw new BadRequestException(
+        'Informe o nome da variação (ex.: Tamanho M / Azul)',
+      );
+    }
+    const parent = await this.prisma.product.findFirst({
+      where: { id: parentId, tenantId },
+    });
+    if (!parent) {
+      throw new NotFoundException('Produto base não encontrado');
+    }
+    if (parent.parentId) {
+      throw new BadRequestException(
+        'Uma variação não pode ser filha de outra variação',
+      );
+    }
   }
 
   private async ensureCategory(tenantId: string, categoryId?: string | null) {

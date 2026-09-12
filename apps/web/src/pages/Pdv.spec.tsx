@@ -105,6 +105,8 @@ function product(overrides: Partial<Product> = {}): Product {
     active: true,
     categoryId: null,
     category: null,
+    parentId: null,
+    variantName: null,
     createdAt: '',
     updatedAt: '',
     ...overrides,

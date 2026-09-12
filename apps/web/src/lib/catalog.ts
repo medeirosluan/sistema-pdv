@@ -21,8 +21,20 @@ export interface Product {
   active: boolean;
   categoryId: string | null;
   category: { id: string; name: string } | null;
+  parentId: string | null;
+  variantName: string | null;
   createdAt: string;
   updatedAt: string;
+  _count?: { variants: number };
+}
+
+/** Nome de exibição do produto, incluindo a variação quando houver (ex.: "Camiseta (P / Azul)"). */
+export function productDisplayName(
+  product: Pick<Product, 'name' | 'variantName'>,
+): string {
+  return product.variantName
+    ? `${product.name} (${product.variantName})`
+    : product.name;
 }
 
 export interface Paginated<T> {
@@ -44,6 +56,8 @@ export interface ProductInput {
   minStock?: number;
   categoryId?: string | null;
   active?: boolean;
+  parentId?: string | null;
+  variantName?: string | null;
 }
 
 export interface ProductQuery {
@@ -52,6 +66,8 @@ export interface ProductQuery {
   search?: string;
   categoryId?: string;
   active?: boolean;
+  parentId?: string;
+  topLevelOnly?: boolean;
 }
 
 export const categoriesApi = {
@@ -77,6 +93,10 @@ export const productsApi = {
     if (query.categoryId) params.set('categoryId', query.categoryId);
     if (query.active !== undefined) {
       params.set('active', String(query.active));
+    }
+    if (query.parentId) params.set('parentId', query.parentId);
+    if (query.topLevelOnly !== undefined) {
+      params.set('topLevelOnly', String(query.topLevelOnly));
     }
     const qs = params.toString();
     return http.get<Paginated<Product>>(`/products${qs ? `?${qs}` : ''}`);

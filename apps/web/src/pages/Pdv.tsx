@@ -23,7 +23,7 @@ import { useConfirm } from '../components/ui/useConfirm';
 import { PaymentModal } from '../components/PaymentModal';
 import { ApiError } from '../lib/api';
 import { useAuth } from '../lib/useAuth';
-import { productsApi, type Product } from '../lib/catalog';
+import { productDisplayName, productsApi, type Product } from '../lib/catalog';
 import type { Customer } from '../lib/customers';
 import { formatBRL } from '../lib/format';
 import { addPendingSale } from '../lib/offline/salesQueue';
@@ -440,7 +440,7 @@ export function Pdv() {
       discount: discount || undefined,
       items: cart.map((line) => ({
         productId: line.product.id,
-        description: line.product.name,
+        description: productDisplayName(line.product),
         unitPrice: Number(line.product.price),
         quantity: line.quantity,
       })),
@@ -462,7 +462,7 @@ export function Pdv() {
       items: cart.map((line, index) => ({
         id: `${clientId}-${index}`,
         productId: line.product.id,
-        description: line.product.name,
+        description: productDisplayName(line.product),
         quantity: line.quantity,
         unitPrice: line.product.price,
         discount: 0,
@@ -703,7 +703,7 @@ export function Pdv() {
                     >
                       <td className="px-4 py-2">
                         <p className="font-medium text-slate-900">
-                          {product.name}
+                          {productDisplayName(product)}
                         </p>
                         <p className="text-xs text-slate-400">
                           {product.barcode || product.sku || '—'}
@@ -784,7 +784,7 @@ export function Pdv() {
                     >
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium text-slate-900">
-                        {line.product.name}
+                        {productDisplayName(line.product)}
                       </p>
                       <p className="text-xs text-slate-400">
                         {formatBRL(line.product.price)} × {line.quantity}
@@ -963,7 +963,7 @@ export function Pdv() {
           <div className="space-y-4 text-sm">
             <div>
               <p className="text-lg font-semibold text-slate-900">
-                {consult.product.name}
+                {productDisplayName(consult.product)}
               </p>
               <p className="text-xs text-slate-400">
                 {consult.product.barcode || consult.product.sku || '—'}

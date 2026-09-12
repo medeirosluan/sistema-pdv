@@ -71,6 +71,11 @@ vi.mock('../components/StockModal', () => ({
     open ? <div data-testid="stock-modal" /> : null,
 }))
 
+vi.mock('../components/VariantsModal', () => ({
+  VariantsModal: ({ open }: { open: boolean }) =>
+    open ? <div data-testid="variants-modal" /> : null,
+}))
+
 function makeProduct(overrides: Partial<Product> = {}): Product {
   return {
     id: 'p1',
@@ -85,6 +90,8 @@ function makeProduct(overrides: Partial<Product> = {}): Product {
     active: true,
     categoryId: null,
     category: null,
+    parentId: null,
+    variantName: null,
     createdAt: '',
     updatedAt: '',
     ...overrides,
@@ -263,5 +270,63 @@ describe('Products', () => {
       expect(downloadTextFileMock).toHaveBeenCalledWith('produtos.csv', 'a;b')
     })
     expect(toastMock.success).toHaveBeenCalledWith('CSV exportado.')
+  })
+
+  describe('variações', () => {
+    it('busca apenas produtos base (topLevelOnly) na listagem principal', async () => {
+      render(<Products />)
+      await screen.findByText('Arroz 5kg')
+
+      expect(productsListMock).toHaveBeenCalledWith(
+        expect.objectContaining({ topLevelOnly: true }),
+      )
+    })
+
+    it('mostra o contador de variações e abre o modal ao clicar nele', async () => {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+      productsListMock.mockResolvedValue(
+        paginated([makeProduct({ _count: { variants: 3 } })]),
+      )
+      render(<Products />)
+      await screen.findByText('Arroz 5kg')
+
+      await user.click(screen.getByText('3 variação(ões)'))
+
+      expect(screen.getByTestId('variants-modal')).toBeInTheDocument()
+    })
+
+    it('abre o modal de variações pelo ícone de ações mesmo sem variações existentes', async () => {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+      render(<Products />)
+      await screen.findByText('Arroz 5kg')
+
+      const row = screen.getByText('Arroz 5kg').closest('tr') as HTMLElement
+      const buttons = within(row).getAllByRole('button', {
+        name: 'Variações (tamanho, cor etc.)',
+      })
+      await user.click(buttons[0])
+
+      expect(screen.getByTestId('variants-modal')).toBeInTheDocument()
+    })
+
+    it('avisa que a exclusão em cascata remove as variações', async () => {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+      productsListMock.mockResolvedValue(
+        paginated([makeProduct({ _count: { variants: 2 } })]),
+      )
+      render(<Products />)
+      await screen.findByText('Arroz 5kg')
+
+      const row = screen.getByText('Arroz 5kg').closest('tr') as HTMLElement
+      const buttons = within(row).getAllByRole('button')
+      await user.click(buttons[buttons.length - 1]) // excluir
+
+      await waitFor(() => expect(confirmMock).toHaveBeenCalled())
+      expect(confirmMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: expect.stringContaining('2 variação(ões)'),
+        }),
+      )
+    })
   })
 })

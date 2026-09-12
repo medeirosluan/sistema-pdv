@@ -12,12 +12,15 @@ interface ProductFormModalProps {
   open: boolean;
   product: Product | null;
   categories: Category[];
+  /** Quando informado, o modal cria/edita uma VARIAÇÃO deste produto base. */
+  parentProduct?: Product | null;
   onClose: () => void;
   onSaved: () => void;
 }
 
 interface FormState {
   name: string;
+  variantName: string;
   sku: string;
   barcode: string;
   price: string;
@@ -31,6 +34,7 @@ interface FormState {
 
 const emptyForm: FormState = {
   name: '',
+  variantName: '',
   sku: '',
   barcode: '',
   price: '',
@@ -49,12 +53,14 @@ export function ProductFormModal({
   open,
   product,
   categories,
+  parentProduct,
   onClose,
   onSaved,
 }: ProductFormModalProps) {
   const [form, setForm] = useState<FormState>(emptyForm);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const isVariant = Boolean(parentProduct);
 
   const resetKey = open ? (product?.id ?? 'new') : null;
   const [appliedResetKey, setAppliedResetKey] = useState<string | null>(null);
@@ -65,6 +71,7 @@ export function ProductFormModal({
       if (product) {
         setForm({
           name: product.name,
+          variantName: product.variantName ?? '',
           sku: product.sku ?? '',
           barcode: product.barcode ?? '',
           price: String(product.price),
@@ -74,6 +81,14 @@ export function ProductFormModal({
           minStock: String(product.minStock ?? 0),
           categoryId: product.categoryId ?? '',
           active: product.active,
+        });
+      } else if (parentProduct) {
+        setForm({
+          ...emptyForm,
+          name: parentProduct.name,
+          price: String(parentProduct.price),
+          unit: parentProduct.unit,
+          categoryId: parentProduct.categoryId ?? '',
         });
       } else {
         setForm(emptyForm);
@@ -103,6 +118,10 @@ export function ProductFormModal({
         : 0,
       categoryId: form.categoryId || null,
       active: form.active,
+      ...(isVariant && {
+        parentId: parentProduct?.id ?? null,
+        variantName: form.variantName.trim(),
+      }),
     };
 
     try {
@@ -124,7 +143,15 @@ export function ProductFormModal({
   return (
     <Modal
       open={open}
-      title={product ? 'Editar produto' : 'Novo produto'}
+      title={
+        isVariant
+          ? product
+            ? 'Editar variação'
+            : 'Nova variação'
+          : product
+            ? 'Editar produto'
+            : 'Novo produto'
+      }
       onClose={onClose}
       footer={
         <>
@@ -152,12 +179,28 @@ export function ProductFormModal({
             Nome *
           </span>
           <input
-            className={inputClass}
+            className={`${inputClass} ${isVariant ? 'bg-slate-50 text-slate-500' : ''}`}
             value={form.name}
             onChange={(e) => update('name', e.target.value)}
+            disabled={isVariant}
             required
           />
         </label>
+
+        {isVariant && (
+          <label className="block">
+            <span className="mb-1.5 block text-sm font-medium text-slate-700">
+              Nome da variação *
+            </span>
+            <input
+              className={inputClass}
+              value={form.variantName}
+              onChange={(e) => update('variantName', e.target.value)}
+              placeholder="Ex.: P / Azul"
+              required
+            />
+          </label>
+        )}
 
         <div className="grid grid-cols-2 gap-4">
           <label className="block">

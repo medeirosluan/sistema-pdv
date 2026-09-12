@@ -48,4 +48,17 @@ export class QueryProductsDto {
   @IsOptional()
   @IsIn(['asc', 'desc'])
   sortOrder?: 'asc' | 'desc';
+
+  /** Filtra apenas as variações de um produto específico. */
+  @IsOptional()
+  @IsUUID()
+  parentId?: string;
+
+  /** Quando true, retorna apenas produtos "base" (que não são variação de outro). */
+  @IsOptional()
+  @Transform(({ value }) =>
+    value === 'true' ? true : value === 'false' ? false : value,
+  )
+  @IsBoolean()
+  topLevelOnly?: boolean;
 }

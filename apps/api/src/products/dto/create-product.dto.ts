@@ -61,4 +61,15 @@ export class CreateProductDto {
   @IsOptional()
   @IsBoolean()
   active?: boolean;
+
+  /** Quando informado, este produto passa a ser uma variação (ex.: tamanho/cor) do produto referenciado. */
+  @IsOptional()
+  @IsUUID()
+  parentId?: string | null;
+
+  /** Rótulo da variação (ex.: "P / Azul"). Obrigatório quando parentId é informado. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  variantName?: string | null;
 }

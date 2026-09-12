@@ -1,6 +1,7 @@
 import {
   Boxes,
   Download,
+  Layers,
   Pencil,
   Plus,
   Search,
@@ -18,6 +19,7 @@ import {
 import { CategoriesModal } from '../components/CategoriesModal';
 import { ProductFormModal } from '../components/ProductFormModal';
 import { StockModal } from '../components/StockModal';
+import { VariantsModal } from '../components/VariantsModal';
 import { useConfirm } from '../components/ui/useConfirm';
 import { useToast } from '../components/ui/useToast';
 import { ApiError } from '../lib/api';
@@ -54,6 +56,7 @@ export function Products() {
   const [editing, setEditing] = useState<Product | null>(null);
   const [categoriesOpen, setCategoriesOpen] = useState(false);
   const [stockProduct, setStockProduct] = useState<Product | null>(null);
+  const [variantsProduct, setVariantsProduct] = useState<Product | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   async function handleExport() {
@@ -105,6 +108,7 @@ export function Products() {
         pageSize: PAGE_SIZE,
         search: debounced || undefined,
         categoryId: categoryFilter || undefined,
+        topLevelOnly: true,
       });
       setItems(data.items);
       setTotal(data.total);
@@ -142,9 +146,12 @@ export function Products() {
   }, [loadCategories]);
 
   async function handleDelete(product: Product) {
+    const hasVariants = (product._count?.variants ?? 0) > 0;
     const ok = await confirm({
       title: 'Excluir produto',
-      message: `Excluir o produto "${product.name}"?`,
+      message: hasVariants
+        ? `Excluir o produto "${product.name}"? Isso também exclui todas as suas ${product._count?.variants} variação(ões).`
+        : `Excluir o produto "${product.name}"?`,
       confirmLabel: 'Excluir',
       danger: true,
     });
@@ -293,8 +300,17 @@ export function Products() {
               items.map((product) => (
                 <tr key={product.id} className="hover:bg-slate-50">
                   <td className="px-4 py-3">
-                    <p className="font-medium text-slate-900">
+                    <p className="flex items-center gap-2 font-medium text-slate-900">
                       {product.name}
+                      {(product._count?.variants ?? 0) > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setVariantsProduct(product)}
+                          className="rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-medium text-violet-700 transition hover:bg-violet-200"
+                        >
+                          {product._count?.variants} variação(ões)
+                        </button>
+                      )}
                     </p>
                     <p className="text-xs text-slate-400">
                       {product.barcode || product.sku || '—'}
@@ -347,6 +363,14 @@ export function Products() {
                       )}
                       {can('products.manage') && (
                         <>
+                          <button
+                            type="button"
+                            onClick={() => setVariantsProduct(product)}
+                            title="Variações (tamanho, cor etc.)"
+                            className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+                          >
+                            <Layers className="h-4 w-4" />
+                          </button>
                           <button
                             type="button"
                             onClick={() => openEdit(product)}
@@ -422,6 +446,14 @@ export function Products() {
         open={stockProduct !== null}
         product={stockProduct}
         onClose={() => setStockProduct(null)}
+        onChanged={() => loadProducts()}
+      />
+
+      <VariantsModal
+        open={variantsProduct !== null}
+        product={variantsProduct}
+        categories={categories}
+        onClose={() => setVariantsProduct(null)}
         onChanged={() => loadProducts()}
       />
     </div>
