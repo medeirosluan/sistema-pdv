@@ -54,7 +54,9 @@ jobs:
         run: npm run prisma:deploy --workspace apps/api
 
       - name: Configurar role de runtime (RLS)
-        run: psql "$DATABASE_URL" -f apps/api/prisma/rls-setup.sql
+        run: psql -h localhost -p 5432 -U pdv -d pdv -f apps/api/prisma/rls-setup.sql
+        env:
+          PGPASSWORD: pdv
 
       - name: Testes e2e (fluxo crítico do PDV)
         run: npm run test:e2e --workspace apps/api
