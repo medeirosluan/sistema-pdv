@@ -8,8 +8,23 @@ on:
 jobs:
   ci:
     runs-on: ubuntu-latest
+    services:
+      db:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: pdv
+          POSTGRES_PASSWORD: pdv
+          POSTGRES_DB: pdv
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U pdv -d pdv"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     env:
-      DATABASE_URL: postgresql://user:pass@localhost:5432/db
+      DATABASE_URL: postgresql://pdv:pdv@localhost:5432/pdv?schema=public
+      APP_DATABASE_URL: postgresql://pdv_app:pdv_app@localhost:5432/pdv?schema=public
       JWT_SECRET: ci-secret-please-change-0123456789
       JWT_REFRESH_SECRET: ci-refresh-secret-0123456789
     steps:
@@ -34,3 +49,12 @@ jobs:
 
       - name: Testes
         run: npm run test
+
+      - name: Aplicar migrations (banco de teste)
+        run: npm run prisma:deploy --workspace apps/api
+
+      - name: Configurar role de runtime (RLS)
+        run: psql "$DATABASE_URL" -f apps/api/prisma/rls-setup.sql
+
+      - name: Testes e2e (fluxo crítico do PDV)
+        run: npm run test:e2e --workspace apps/api
