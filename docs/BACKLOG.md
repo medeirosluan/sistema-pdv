@@ -91,6 +91,7 @@ Legenda: `[ ]` pendente · `[~]` em andamento · `[x]` concluído
 - [x] Fase C — Caixa offline (fila + idempotência), preço preservado na venda, cache do caixa e reconciliação de catálogo
 - [x] App instalável (PWA: ícones 192/512, manifest, botão "Instalar app")
 - [x] App desktop instalável (Tauri) — instalador NSIS (.exe)
+- [x] Auto-update do app desktop (checagem automática ao abrir + manual em Configurações, release assinado via GitHub Actions/Releases) — validado de ponta a ponta em 2026-09-12 (v0.1.2 detectou e instalou a v0.1.3 sozinho)
 - [ ] Impressora térmica e gaveta de dinheiro no app desktop (Tauri)
 - [ ] Deploy da API + URL configurável no app desktop
 
