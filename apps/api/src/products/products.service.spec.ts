@@ -157,8 +157,28 @@ describe('ProductsService', () => {
       );
     });
 
-    it('não gera SKU quando um é informado explicitamente', async () => {
+    it('não gera SKU nem código de barras quando ambos são informados explicitamente', async () => {
       prisma.product.findFirst.mockResolvedValue(null);
+      prisma.product.create.mockResolvedValue({ id: 'p1' });
+
+      await service.create('tenant-1', {
+        name: 'Produto X',
+        price: 10,
+        sku: 'MEU-SKU',
+        barcode: '789123',
+      } as never);
+
+      expect(prisma.product.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ sku: 'MEU-SKU', barcode: '789123' }),
+        }),
+      );
+      expect(prisma.product.count).not.toHaveBeenCalled();
+    });
+
+    it('gera um código de barras EAN-13 sequencial quando nenhum é informado', async () => {
+      prisma.product.findFirst.mockResolvedValue(null);
+      prisma.product.count.mockResolvedValue(0);
       prisma.product.create.mockResolvedValue({ id: 'p1' });
 
       await service.create('tenant-1', {
@@ -169,10 +189,29 @@ describe('ProductsService', () => {
 
       expect(prisma.product.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({ sku: 'MEU-SKU' }),
+          data: expect.objectContaining({ barcode: '2000000000015' }),
         }),
       );
-      expect(prisma.product.count).not.toHaveBeenCalled();
+    });
+
+    it('tenta o próximo número quando o código de barras candidato já está em uso', async () => {
+      prisma.product.findFirst
+        .mockResolvedValueOnce({ id: 'existing' }) // 2000000000015 já existe
+        .mockResolvedValueOnce(null); // próximo candidato disponível
+      prisma.product.count.mockResolvedValue(0);
+      prisma.product.create.mockResolvedValue({ id: 'p1' });
+
+      await service.create('tenant-1', {
+        name: 'Produto X',
+        price: 10,
+        sku: 'MEU-SKU',
+      } as never);
+
+      expect(prisma.product.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ barcode: '2000000000022' }),
+        }),
+      );
     });
 
     it('lança NotFoundException quando a categoria informada não existe', async () => {
@@ -436,6 +475,35 @@ describe('ProductsService', () => {
           data: expect.objectContaining({ sku: 'SKU-NOVO' }),
         }),
       );
+    });
+
+    it('gera um código de barras para um produto novo quando a linha do CSV não informa um', async () => {
+      prisma.product.findFirst.mockResolvedValue(null);
+      prisma.product.count.mockResolvedValue(0);
+      prisma.product.create.mockResolvedValue({ id: 'created' });
+
+      const csv = ['nome,preco', 'Produto Novo,10.00'].join('\n');
+      await service.importCsv('tenant-1', csv);
+
+      expect(prisma.product.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ barcode: '2000000000015' }),
+        }),
+      );
+    });
+
+    it('preserva o código de barras existente quando a linha de atualização não informa um', async () => {
+      prisma.product.findFirst.mockResolvedValue({
+        id: 'existing-id',
+        barcode: '7891234567890',
+      });
+      prisma.product.update.mockResolvedValue({ id: 'existing-id' });
+
+      const csv = ['nome,preco,sku', 'Produto Existente,20.00,SKU-X'].join('\n');
+      await service.importCsv('tenant-1', csv);
+
+      const updateCall = prisma.product.update.mock.calls[0][0];
+      expect(updateCall.data).not.toHaveProperty('barcode');
     });
 
     it('para de criar novos produtos ao atingir o limite do plano, mas mantém as atualizações', async () => {

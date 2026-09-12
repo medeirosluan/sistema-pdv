@@ -95,13 +95,15 @@ export class ProductsService {
     }
 
     const sku = dto.sku?.trim() || (await this.generateSku(tenantId));
+    const barcode =
+      dto.barcode?.trim() || (await this.generateBarcode(tenantId));
 
     return this.prisma.product.create({
       data: {
         tenantId,
         name: dto.name.trim(),
         sku,
-        barcode: dto.barcode?.trim() || null,
+        barcode,
         price: dto.price,
         cost: dto.cost ?? null,
         unit: dto.unit?.trim() || 'UN',
@@ -273,7 +275,6 @@ export class ProductsService {
 
       const data = {
         name,
-        barcode,
         price,
         cost,
         unit,
@@ -287,8 +288,12 @@ export class ProductsService {
         if (existing) {
           await this.prisma.product.update({
             where: { id: existing.id },
-            // uma linha sem SKU não deve apagar o SKU que o produto já tinha
-            data: { ...data, ...(sku ? { sku } : {}) },
+            // uma linha sem SKU/código de barras não deve apagar o valor que o produto já tinha
+            data: {
+              ...data,
+              ...(sku ? { sku } : {}),
+              ...(barcode ? { barcode } : {}),
+            },
           });
           updated += 1;
         } else {
@@ -305,6 +310,7 @@ export class ProductsService {
               tenantId,
               ...data,
               sku: sku ?? (await this.generateSku(tenantId)),
+              barcode: barcode ?? (await this.generateBarcode(tenantId)),
             },
           });
           created += 1;
@@ -362,6 +368,41 @@ export class ProductsService {
     throw new ConflictException(
       'Não foi possível gerar um SKU automático; informe um manualmente',
     );
+  }
+
+  /**
+   * Gera um código de barras EAN-13 sequencial quando o usuário não informa um.
+   * Usa o prefixo 20-29, reservado pela GS1 para uso interno/não varejo, com
+   * dígito verificador válido, então o código pode ser impresso e escaneado
+   * normalmente. Confere disponibilidade como em generateSku, já que a
+   * contagem usada como base pode ficar defasada sob concorrência.
+   */
+  private async generateBarcode(tenantId: string): Promise<string> {
+    const base = await this.prisma.product.count({ where: { tenantId } });
+    for (let attempt = 0; attempt < 1000; attempt += 1) {
+      const body = `20${String(base + 1 + attempt).padStart(10, '0')}`;
+      const candidate = `${body}${this.ean13CheckDigit(body)}`;
+      const exists = await this.prisma.product.findFirst({
+        where: { tenantId, barcode: candidate },
+        select: { id: true },
+      });
+      if (!exists) {
+        return candidate;
+      }
+    }
+    throw new ConflictException(
+      'Não foi possível gerar um código de barras automático; informe um manualmente',
+    );
+  }
+
+  private ean13CheckDigit(body12: string): string {
+    const sum = body12
+      .split('')
+      .reduce(
+        (acc, digit, index) => acc + Number(digit) * (index % 2 === 0 ? 1 : 3),
+        0,
+      );
+    return String((10 - (sum % 10)) % 10);
   }
 
   private async ensureParent(
