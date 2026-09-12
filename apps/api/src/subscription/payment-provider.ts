@@ -99,7 +99,7 @@ export class AsaasPaymentProvider implements PaymentProvider {
         'User-Agent': 'SistemaPDV/1.0 (Node.js)',
         access_token: this.apiKey,
       },
-      body: body ? JSON.stringify(body) : undefined,
+      ...(method !== 'GET' && body ? { body: JSON.stringify(body) } : {}),
     });
 
     if (!response.ok) {

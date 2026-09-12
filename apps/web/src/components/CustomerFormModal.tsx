@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import { ApiError } from '../lib/api';
 import { customersApi, type Customer, type CustomerInput } from '../lib/customers';
 import { Modal } from './Modal';
@@ -37,22 +37,24 @@ export function CustomerFormModal({
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    if (!open) {
-      return;
+  const resetKey = open ? (customer?.id ?? 'new') : null;
+  const [appliedResetKey, setAppliedResetKey] = useState<string | null>(null);
+  if (resetKey !== appliedResetKey) {
+    setAppliedResetKey(resetKey);
+    if (resetKey !== null) {
+      setError(null);
+      if (customer) {
+        setForm({
+          name: customer.name,
+          document: customer.document ?? '',
+          phone: customer.phone ?? '',
+          email: customer.email ?? '',
+        });
+      } else {
+        setForm(emptyForm);
+      }
     }
-    setError(null);
-    if (customer) {
-      setForm({
-        name: customer.name,
-        document: customer.document ?? '',
-        phone: customer.phone ?? '',
-        email: customer.email ?? '',
-      });
-    } else {
-      setForm(emptyForm);
-    }
-  }, [open, customer]);
+  }
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));

@@ -13,9 +13,9 @@ import {
   type FormEvent,
 } from 'react';
 import { ApiError } from '../lib/api';
-import { useAuth } from '../lib/auth';
-import { useConfirm } from '../components/ui/ConfirmDialog';
-import { useToast } from '../components/ui/Toast';
+import { useAuth } from '../lib/useAuth';
+import { useConfirm } from '../components/ui/useConfirm';
+import { useToast } from '../components/ui/useToast';
 import {
   addPendingCashMovement,
   listPendingCashMovements,
@@ -122,9 +122,13 @@ export function CashRegister() {
   }, []);
 
   useEffect(() => {
-    Promise.all([loadCurrent(), loadHistory()]).finally(() =>
-      setLoading(false),
-    );
+    void (async () => {
+      try {
+        await Promise.all([loadCurrent(), loadHistory()]);
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, [loadCurrent, loadHistory]);
 
   async function handleOpen(event: FormEvent<HTMLFormElement>) {

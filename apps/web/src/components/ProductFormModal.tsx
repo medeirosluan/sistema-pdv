@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import { ApiError } from '../lib/api';
 import {
   productsApi,
@@ -56,28 +56,30 @@ export function ProductFormModal({
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    if (!open) {
-      return;
+  const resetKey = open ? (product?.id ?? 'new') : null;
+  const [appliedResetKey, setAppliedResetKey] = useState<string | null>(null);
+  if (resetKey !== appliedResetKey) {
+    setAppliedResetKey(resetKey);
+    if (resetKey !== null) {
+      setError(null);
+      if (product) {
+        setForm({
+          name: product.name,
+          sku: product.sku ?? '',
+          barcode: product.barcode ?? '',
+          price: String(product.price),
+          cost: product.cost === null ? '' : String(product.cost),
+          unit: product.unit,
+          stock: String(product.stock),
+          minStock: String(product.minStock ?? 0),
+          categoryId: product.categoryId ?? '',
+          active: product.active,
+        });
+      } else {
+        setForm(emptyForm);
+      }
     }
-    setError(null);
-    if (product) {
-      setForm({
-        name: product.name,
-        sku: product.sku ?? '',
-        barcode: product.barcode ?? '',
-        price: String(product.price),
-        cost: product.cost === null ? '' : String(product.cost),
-        unit: product.unit,
-        stock: String(product.stock),
-        minStock: String(product.minStock ?? 0),
-        categoryId: product.categoryId ?? '',
-        active: product.active,
-      });
-    } else {
-      setForm(emptyForm);
-    }
-  }, [open, product]);
+  }
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));

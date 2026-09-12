@@ -1,9 +1,9 @@
 import { Check, X } from 'lucide-react';
 import { Fragment, useEffect, useState, type FormEvent } from 'react';
-import { useConfirm } from '../components/ui/ConfirmDialog';
+import { useConfirm } from '../components/ui/useConfirm';
 import { ApiError, type TenantInfo, type UserRole } from '../lib/api';
 import { api } from '../lib/api';
-import { useAuth } from '../lib/auth';
+import { useAuth } from '../lib/useAuth';
 import {
   BRAND_KEYS,
   BRAND_LABELS,

@@ -35,6 +35,7 @@ export function Audit() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [debounced, setDebounced] = useState('');
+  const [prevDebounced, setPrevDebounced] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -64,12 +65,15 @@ export function Audit() {
     return () => clearTimeout(timeout);
   }, [search]);
 
-  useEffect(() => {
+  if (debounced !== prevDebounced) {
+    setPrevDebounced(debounced);
     setPage(1);
-  }, [debounced]);
+  }
 
   useEffect(() => {
-    load();
+    void (async () => {
+      await load();
+    })();
   }, [load]);
 
   return (

@@ -18,8 +18,8 @@ import {
 import { CategoriesModal } from '../components/CategoriesModal';
 import { ProductFormModal } from '../components/ProductFormModal';
 import { StockModal } from '../components/StockModal';
-import { useConfirm } from '../components/ui/ConfirmDialog';
-import { useToast } from '../components/ui/Toast';
+import { useConfirm } from '../components/ui/useConfirm';
+import { useToast } from '../components/ui/useToast';
 import { ApiError } from '../lib/api';
 import {
   categoriesApi,
@@ -47,6 +47,7 @@ export function Products() {
   const [search, setSearch] = useState('');
   const [debounced, setDebounced] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
+  const [prevFilterKey, setPrevFilterKey] = useState('|');
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [formOpen, setFormOpen] = useState(false);
@@ -122,16 +123,22 @@ export function Products() {
     return () => clearTimeout(timeout);
   }, [search]);
 
-  useEffect(() => {
+  const filterKey = `${debounced}|${categoryFilter}`;
+  if (filterKey !== prevFilterKey) {
+    setPrevFilterKey(filterKey);
     setPage(1);
-  }, [debounced, categoryFilter]);
+  }
 
   useEffect(() => {
-    loadProducts();
+    void (async () => {
+      await loadProducts();
+    })();
   }, [loadProducts]);
 
   useEffect(() => {
-    loadCategories();
+    void (async () => {
+      await loadCategories();
+    })();
   }, [loadCategories]);
 
   async function handleDelete(product: Product) {

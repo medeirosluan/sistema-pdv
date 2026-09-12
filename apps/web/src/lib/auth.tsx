@@ -1,44 +1,27 @@
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-  type ReactNode,
-} from 'react';
-import { api, tokenStore, type RegisterPayload, type UserInfo } from './api';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { api, tokenStore, type UserInfo } from './api';
 import { applyBrandColor } from './brand';
-
-interface AuthContextValue {
-  user: UserInfo | null;
-  loading: boolean;
-  login: (
-    tenantSlug: string,
-    email: string,
-    password: string,
-    totp?: string,
-  ) => Promise<void>;
-  register: (payload: RegisterPayload) => Promise<void>;
-  refresh: () => Promise<UserInfo>;
-  logout: () => void;
-}
-
-const AuthContext = createContext<AuthContextValue | undefined>(undefined);
+import { AuthContext, type AuthContextValue } from './authContext';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserInfo | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!tokenStore.access) {
-      setLoading(false);
-      return;
+    async function run() {
+      if (!tokenStore.access) {
+        setLoading(false);
+        return;
+      }
+      try {
+        setUser(await api.me());
+      } catch {
+        tokenStore.clear();
+      } finally {
+        setLoading(false);
+      }
     }
-    api
-      .me()
-      .then(setUser)
-      .catch(() => tokenStore.clear())
-      .finally(() => setLoading(false));
+    void run();
   }, []);
 
   useEffect(() => {
@@ -74,12 +57,4 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-}
-
-export function useAuth(): AuthContextValue {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth deve ser usado dentro de AuthProvider');
-  }
-  return context;
 }

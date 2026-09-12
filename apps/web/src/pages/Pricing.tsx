@@ -30,7 +30,7 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useAuth } from '../lib/auth';
+import { useAuth } from '../lib/useAuth';
 import { formatBRL } from '../lib/format';
 import { PLANS, type PlanKey } from '../lib/tenant';
 

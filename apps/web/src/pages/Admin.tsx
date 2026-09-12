@@ -1,7 +1,7 @@
 import { Search } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { ApiError } from '../lib/api';
-import { useAuth } from '../lib/auth';
+import { useAuth } from '../lib/useAuth';
 import {
   adminApi,
   planLabels,
@@ -26,6 +26,7 @@ export function Admin() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [debounced, setDebounced] = useState('');
+  const [prevDebounced, setPrevDebounced] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -64,16 +65,21 @@ export function Admin() {
     return () => clearTimeout(timeout);
   }, [search]);
 
-  useEffect(() => {
+  if (debounced !== prevDebounced) {
+    setPrevDebounced(debounced);
     setPage(1);
-  }, [debounced]);
+  }
 
   useEffect(() => {
-    loadTenants();
+    void (async () => {
+      await loadTenants();
+    })();
   }, [loadTenants]);
 
   useEffect(() => {
-    loadSummary();
+    void (async () => {
+      await loadSummary();
+    })();
   }, [loadSummary]);
 
   async function updateTenant(

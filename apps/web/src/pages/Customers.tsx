@@ -1,8 +1,8 @@
 import { Pencil, Plus, Search, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { CustomerFormModal } from '../components/CustomerFormModal';
-import { useConfirm } from '../components/ui/ConfirmDialog';
-import { useToast } from '../components/ui/Toast';
+import { useConfirm } from '../components/ui/useConfirm';
+import { useToast } from '../components/ui/useToast';
 import { ApiError } from '../lib/api';
 import { customersApi, type Customer } from '../lib/customers';
 import { useCan } from '../lib/permissions';
@@ -19,6 +19,7 @@ export function Customers() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [debounced, setDebounced] = useState('');
+  const [prevDebounced, setPrevDebounced] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
@@ -50,12 +51,15 @@ export function Customers() {
     return () => clearTimeout(timeout);
   }, [search]);
 
-  useEffect(() => {
+  if (debounced !== prevDebounced) {
+    setPrevDebounced(debounced);
     setPage(1);
-  }, [debounced]);
+  }
 
   useEffect(() => {
-    load();
+    void (async () => {
+      await load();
+    })();
   }, [load]);
 
   async function handleDelete(customer: Customer) {

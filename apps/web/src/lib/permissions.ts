@@ -1,5 +1,5 @@
 import type { UserRole } from './api';
-import { useAuth } from './auth';
+import { useAuth } from './useAuth';
 
 export type Permission =
   | 'sales.create'

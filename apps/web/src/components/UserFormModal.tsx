@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import type { UserRole } from '../lib/api';
 import { ApiError } from '../lib/api';
 import {
@@ -56,24 +56,26 @@ export function UserFormModal({
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    if (!open) {
-      return;
+  const resetKey = open ? (user?.id ?? 'new') : null;
+  const [appliedResetKey, setAppliedResetKey] = useState<string | null>(null);
+  if (resetKey !== appliedResetKey) {
+    setAppliedResetKey(resetKey);
+    if (resetKey !== null) {
+      setError(null);
+      if (user) {
+        setForm({
+          name: user.name,
+          email: user.email,
+          password: '',
+          role: user.role,
+          active: user.active,
+          permissions: user.permissions,
+        });
+      } else {
+        setForm(emptyForm);
+      }
     }
-    setError(null);
-    if (user) {
-      setForm({
-        name: user.name,
-        email: user.email,
-        password: '',
-        role: user.role,
-        active: user.active,
-        permissions: user.permissions,
-      });
-    } else {
-      setForm(emptyForm);
-    }
-  }, [open, user]);
+  }
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));

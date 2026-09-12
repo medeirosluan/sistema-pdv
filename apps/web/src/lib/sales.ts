@@ -22,6 +22,19 @@ export interface SalePayment {
   installments: number;
 }
 
+export interface PaymentLine {
+  id: string;
+  method: PaymentMethod;
+  amount: string;
+}
+
+export function newPaymentLine(
+  method: PaymentMethod = 'CASH',
+  amount = '',
+): PaymentLine {
+  return { id: crypto.randomUUID(), method, amount };
+}
+
 export interface Sale {
   id: string;
   number: number;

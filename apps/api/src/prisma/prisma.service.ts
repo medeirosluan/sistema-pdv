@@ -8,6 +8,7 @@ import type { PrismaClient } from '../generated/prisma/client.js';
  * O merge interface+classe garante que `PrismaService` exponha todos os
  * métodos do PrismaClient para os serviços (sem mudanças no código deles).
  */
+// oxlint-disable-next-line no-unsafe-declaration-merging -- merge intencional, ver comentário acima
 export interface PrismaService extends PrismaClient {}
 
 export class PrismaService {}

@@ -68,16 +68,26 @@ export function StockModal({
     }
   }, []);
 
+  const resetKey = open && product ? product.id : null;
+  const [appliedResetKey, setAppliedResetKey] = useState<string | null>(null);
+  if (resetKey !== appliedResetKey) {
+    setAppliedResetKey(resetKey);
+    if (resetKey !== null) {
+      setType('IN');
+      setQuantity('');
+      setReason('');
+      setError(null);
+      setCurrentStock(Number(product!.stock));
+    }
+  }
+
   useEffect(() => {
     if (!open || !product) {
       return;
     }
-    setType('IN');
-    setQuantity('');
-    setReason('');
-    setError(null);
-    setCurrentStock(Number(product.stock));
-    loadMovements(product.id);
+    void (async () => {
+      await loadMovements(product.id);
+    })();
   }, [open, product, loadMovements]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {

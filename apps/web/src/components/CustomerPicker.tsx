@@ -1,6 +1,6 @@
 import { Search, User, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { useAuth } from '../lib/auth';
+import { useAuth } from '../lib/useAuth';
 import { customersApi, type Customer } from '../lib/customers';
 import { searchCachedCustomers } from '../lib/offline/catalogCache';
 

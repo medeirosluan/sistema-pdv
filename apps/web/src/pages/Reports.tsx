@@ -50,7 +50,9 @@ export function Reports() {
   }, [from, to]);
 
   useEffect(() => {
-    load();
+    void (async () => {
+      await load();
+    })();
   }, [load]);
 
   const maxDay = Math.max(

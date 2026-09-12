@@ -2,7 +2,7 @@ import { Lock, Mail, Store, User } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { ApiError } from '../lib/api';
-import { useAuth } from '../lib/auth';
+import { useAuth } from '../lib/useAuth';
 
 function slugify(value: string): string {
   return value

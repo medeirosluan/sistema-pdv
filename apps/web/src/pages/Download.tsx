@@ -6,7 +6,7 @@ import {
   Smartphone,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { useAuth } from '../lib/auth';
+import { useAuth } from '../lib/useAuth';
 
 const APP_VERSION = '0.1.0';
 const INSTALLER_URL = '/downloads/Sistema-PDV-Setup.exe';

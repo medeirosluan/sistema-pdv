@@ -19,23 +19,25 @@ import {
 } from 'react';
 import { CustomerPicker } from '../components/CustomerPicker';
 import { Modal } from '../components/Modal';
-import { useConfirm } from '../components/ui/ConfirmDialog';
-import {
-  PaymentModal,
-  newPaymentLine,
-  type PaymentLine,
-} from '../components/PaymentModal';
+import { useConfirm } from '../components/ui/useConfirm';
+import { PaymentModal } from '../components/PaymentModal';
 import { ApiError } from '../lib/api';
-import { useAuth } from '../lib/auth';
+import { useAuth } from '../lib/useAuth';
 import { productsApi, type Product } from '../lib/catalog';
 import type { Customer } from '../lib/customers';
 import { formatBRL } from '../lib/format';
 import { addPendingSale } from '../lib/offline/salesQueue';
 import { printReceipt } from '../lib/receipt';
 import { searchCachedProducts } from '../lib/offline/catalogCache';
-import { useKiosk } from '../lib/kiosk';
+import { useKiosk } from '../lib/useKiosk';
 import { useHotkeys } from '../lib/useHotkeys';
-import { salesApi, type CreateSaleInput, type Sale } from '../lib/sales';
+import {
+  newPaymentLine,
+  salesApi,
+  type CreateSaleInput,
+  type PaymentLine,
+  type Sale,
+} from '../lib/sales';
 
 interface CartLine {
   product: Product;
@@ -74,6 +76,10 @@ export function Pdv() {
   const [lastSaleOffline, setLastSaleOffline] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [highlightedResult, setHighlightedResult] = useState(-1);
+  const [prevHighlightDeps, setPrevHighlightDeps] = useState<{
+    debounced: string;
+    results: Product[];
+  } | null>(null);
   const [selectedLineId, setSelectedLineId] = useState<string | null>(null);
   const [lastAddedId, setLastAddedId] = useState<string | null>(null);
   const [consult, setConsult] = useState<{
@@ -93,16 +99,16 @@ export function Pdv() {
   }, [search]);
 
   useEffect(() => {
-    if (!debounced) {
-      setResults([]);
-      setLoading(false);
-      return;
-    }
     const tenantId = user?.tenant.id ?? '';
     let active = true;
-    setLoading(true);
 
     async function run() {
+      if (!debounced) {
+        setResults([]);
+        setLoading(false);
+        return;
+      }
+      setLoading(true);
       if (!navigator.onLine) {
         const cached = await searchCachedProducts(tenantId, debounced);
         if (active) {
@@ -138,9 +144,14 @@ export function Pdv() {
     };
   }, [debounced, user?.tenant.id]);
 
-  useEffect(() => {
+  if (
+    !prevHighlightDeps ||
+    prevHighlightDeps.debounced !== debounced ||
+    prevHighlightDeps.results !== results
+  ) {
+    setPrevHighlightDeps({ debounced, results });
     setHighlightedResult(-1);
-  }, [debounced, results]);
+  }
 
   const subtotal = useMemo(
     () =>

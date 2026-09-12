@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import { ApiError } from '../lib/api';
 import { usersApi, type ManagedUser } from '../lib/users';
 import { Modal } from './Modal';
@@ -20,12 +20,14 @@ export function PasswordModal({
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
+  const [appliedOpen, setAppliedOpen] = useState(false);
+  if (open !== appliedOpen) {
+    setAppliedOpen(open);
     if (open) {
       setPassword('');
       setError(null);
     }
-  }, [open]);
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

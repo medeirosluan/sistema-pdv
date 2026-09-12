@@ -17,7 +17,7 @@ import {
   type SalesReport,
 } from '../lib/reports';
 import { paymentMethodLabels } from '../lib/sales';
-import { useAuth } from '../lib/auth';
+import { useAuth } from '../lib/useAuth';
 
 const quickActions = [
   {

@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { useAuth } from '../lib/auth';
+import { useAuth } from '../lib/useAuth';
 import type { UserRole } from '../lib/api';
 import { refreshCatalog } from '../lib/offline/catalogCache';
 import {
@@ -33,7 +33,7 @@ import {
   syncPendingSales,
 } from '../lib/offline/salesQueue';
 import { useOnlineStatus } from '../lib/offline/useOnlineStatus';
-import { useKiosk } from '../lib/kiosk';
+import { useKiosk } from '../lib/useKiosk';
 import { useCan, type Permission } from '../lib/permissions';
 import { useInstallPrompt } from '../lib/useInstallPrompt';
 import { useHotkeys } from '../lib/useHotkeys';

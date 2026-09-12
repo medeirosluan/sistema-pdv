@@ -1,21 +1,11 @@
 import {
-  createContext,
   useCallback,
-  useContext,
   useEffect,
   useMemo,
   useState,
   type ReactNode,
 } from 'react';
-
-interface KioskContextValue {
-  kiosk: boolean;
-  enter: () => Promise<void>;
-  exit: () => Promise<void>;
-  toggle: () => Promise<void>;
-}
-
-const KioskContext = createContext<KioskContextValue | undefined>(undefined);
+import { KioskContext, type KioskContextValue } from './kioskContext';
 
 export function KioskProvider({ children }: { children: ReactNode }) {
   const [kiosk, setKiosk] = useState(false);
@@ -72,12 +62,4 @@ export function KioskProvider({ children }: { children: ReactNode }) {
   return (
     <KioskContext.Provider value={value}>{children}</KioskContext.Provider>
   );
-}
-
-export function useKiosk(): KioskContextValue {
-  const context = useContext(KioskContext);
-  if (!context) {
-    throw new Error('useKiosk deve ser usado dentro de KioskProvider');
-  }
-  return context;
 }

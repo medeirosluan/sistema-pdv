@@ -5,15 +5,14 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
 } from 'react';
 import { formatBRL } from '../lib/format';
-import { paymentMethodLabels, type PaymentMethod } from '../lib/sales';
+import {
+  newPaymentLine,
+  paymentMethodLabels,
+  type PaymentLine,
+  type PaymentMethod,
+} from '../lib/sales';
 import { useHotkeys } from '../lib/useHotkeys';
 import { Modal } from './Modal';
-
-export interface PaymentLine {
-  id: string;
-  method: PaymentMethod;
-  amount: string;
-}
 
 const paymentMethods: PaymentMethod[] = ['CASH', 'PIX', 'CREDIT', 'DEBIT'];
 
@@ -23,13 +22,6 @@ const methodKeys: Record<PaymentMethod, string> = {
   CREDIT: '3',
   DEBIT: '4',
 };
-
-export function newPaymentLine(
-  method: PaymentMethod = 'CASH',
-  amount = '',
-): PaymentLine {
-  return { id: crypto.randomUUID(), method, amount };
-}
 
 function parseNumber(value: string): number {
   const parsed = Number(value.replace(',', '.'));

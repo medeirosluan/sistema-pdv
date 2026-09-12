@@ -1,10 +1,10 @@
 import { Eye, Printer, Receipt, XCircle } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { Modal } from '../components/Modal';
-import { useConfirm } from '../components/ui/ConfirmDialog';
-import { useToast } from '../components/ui/Toast';
+import { useConfirm } from '../components/ui/useConfirm';
+import { useToast } from '../components/ui/useToast';
 import { ApiError } from '../lib/api';
-import { useAuth } from '../lib/auth';
+import { useAuth } from '../lib/useAuth';
 import { formatBRL, formatDateTime } from '../lib/format';
 import { useCan } from '../lib/permissions';
 import { printReceipt } from '../lib/receipt';
@@ -65,7 +65,9 @@ export function Sales() {
   }, [page, statusFilter]);
 
   useEffect(() => {
-    load();
+    void (async () => {
+      await load();
+    })();
   }, [load]);
 
   async function handleCancel(sale: Sale) {

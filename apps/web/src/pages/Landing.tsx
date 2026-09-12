@@ -11,7 +11,7 @@ import {
 import { Link } from 'react-router-dom';
 import { PublicFooter } from '../components/PublicFooter';
 import { PublicHeader } from '../components/PublicHeader';
-import { useAuth } from '../lib/auth';
+import { useAuth } from '../lib/useAuth';
 import { formatBRL } from '../lib/format';
 
 const features = [
