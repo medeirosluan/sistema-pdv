@@ -231,19 +231,24 @@ export function Pdv() {
       }
     }
 
-    const highlighted =
-      highlightedResult >= 0 ? results[highlightedResult] : undefined;
-    if (highlighted) {
-      addToCart(highlighted, quantity);
-      clearSearch();
-      return;
-    }
-
+    // Um código escaneado (leitor de código de barras) que bate exatamente
+    // com um produto sempre tem prioridade sobre um item destacado via
+    // setas: sem isso, uma navegação por setas feita antes (ainda "presa"
+    // por causa do debounce da busca) faria um scan adicionar o produto
+    // errado ao carrinho.
     const local = results.find(
       (product) => product.barcode === code || product.sku === code,
     );
     if (local) {
       addToCart(local, quantity);
+      clearSearch();
+      return;
+    }
+
+    const highlighted =
+      highlightedResult >= 0 ? results[highlightedResult] : undefined;
+    if (highlighted) {
+      addToCart(highlighted, quantity);
       clearSearch();
       return;
     }

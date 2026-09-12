@@ -184,6 +184,39 @@ describe('Pdv', () => {
     expect(screen.getByText('R$ 3,00 × 1')).toBeInTheDocument()
   })
 
+  it('prioriza um código de barras exato sobre um item apenas destacado por navegação (leitor de código de barras)', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    productsListMock.mockResolvedValue({
+      items: [
+        product({ id: 'p1', name: 'Água Mineral 500ml', barcode: '789123' }),
+        product({ id: 'p2', name: 'Refrigerante Cola', barcode: '999999' }),
+      ],
+      total: 2,
+      page: 1,
+      pageSize: 24,
+      totalPages: 1,
+    })
+    render(<Pdv />)
+
+    const searchInput = screen.getByPlaceholderText(
+      'Buscar ou bipar código de barras — F2',
+    )
+    // Digita o código de barras exato do segundo produto (simula o leitor).
+    await user.type(searchInput, '999999')
+    await waitFor(() => {
+      expect(screen.getByText('Refrigerante Cola')).toBeInTheDocument()
+    })
+
+    // Uma navegação por setas (real ou uma tecla espúria do próprio leitor)
+    // destaca o PRIMEIRO produto, que não é o do código digitado.
+    await user.keyboard('{ArrowDown}')
+    await user.keyboard('{Enter}')
+
+    expect(screen.getByText('1 item(ns)')).toBeInTheDocument()
+    expect(screen.getByText('Refrigerante Cola')).toBeInTheDocument()
+    expect(screen.queryByText('Água Mineral 500ml')).not.toBeInTheDocument()
+  })
+
   it('atualiza a quantidade e o total ao clicar em + no carrinho', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
     render(<Pdv />)
