@@ -3,5 +3,5 @@
   "identifier": "default",
   "description": "Capacidades padrão do app desktop",
   "windows": ["main"],
-  "permissions": ["core:default"]
+  "permissions": ["core:default", "allow-list-printers", "allow-print-raw"]
 }

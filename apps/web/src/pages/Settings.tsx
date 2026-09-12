@@ -10,13 +10,16 @@ import {
   BRAND_PALETTES,
   applyBrandColor,
 } from '../lib/brand';
+import { buildTestPrintEscPos } from '../lib/escpos';
 import { formatBRL } from '../lib/format';
 import { PERMISSIONS, PERMISSION_GROUPS, useCan } from '../lib/permissions';
+import { getPreferredPrinter, setPreferredPrinter } from '../lib/printerSettings';
 import {
   subscriptionApi,
   subscriptionStatusLabels,
   type SubscriptionInfo,
 } from '../lib/subscription';
+import { isTauri, listPrinters, printRaw, type PrinterInfo } from '../lib/tauri';
 import { PLANS, tenantApi, type PlanInfo, type PlanKey } from '../lib/tenant';
 
 const inputClass =
@@ -68,8 +71,43 @@ export function Settings() {
   } | null>(null);
   const [twoFactorBusy, setTwoFactorBusy] = useState(false);
 
+  const [desktopPrinters, setDesktopPrinters] = useState<PrinterInfo[]>([]);
+  const [selectedPrinter, setSelectedPrinter] = useState(
+    () => getPreferredPrinter() ?? '',
+  );
+  const [printerBusy, setPrinterBusy] = useState(false);
+  const [printerError, setPrinterError] = useState<string | null>(null);
+
   const can = useCan();
   const canEdit = can('settings.manage');
+
+  useEffect(() => {
+    if (!isTauri()) {
+      return;
+    }
+    listPrinters()
+      .then(setDesktopPrinters)
+      .catch(() => setPrinterError('Não foi possível listar as impressoras.'));
+  }, []);
+
+  function handlePrinterChange(name: string) {
+    setSelectedPrinter(name);
+    setPreferredPrinter(name || null);
+  }
+
+  async function handleTestPrint() {
+    setPrinterBusy(true);
+    setPrinterError(null);
+    try {
+      await printRaw(selectedPrinter || null, buildTestPrintEscPos(receiptWidth));
+    } catch (err) {
+      setPrinterError(
+        err instanceof Error ? err.message : 'Erro ao imprimir teste',
+      );
+    } finally {
+      setPrinterBusy(false);
+    }
+  }
 
   useEffect(() => {
     tenantApi
@@ -683,6 +721,53 @@ export function Settings() {
           </div>
         )}
       </form>
+
+      {isTauri() && (
+        <div className="rounded-2xl border border-slate-200 bg-white p-6">
+          <h3 className="text-base font-semibold text-slate-900">
+            Impressora do cupom (app desktop)
+          </h3>
+          <p className="mt-1 text-sm text-slate-500">
+            Impressão direta na impressora térmica, sem abrir o diálogo de
+            impressão do Windows. Configuração salva apenas neste
+            computador.
+          </p>
+
+          <div className="mt-5 flex flex-wrap items-end gap-3">
+            <label className="block">
+              <span className="mb-1.5 block text-sm font-medium text-slate-700">
+                Impressora
+              </span>
+              <select
+                className={inputClass}
+                value={selectedPrinter}
+                onChange={(e) => handlePrinterChange(e.target.value)}
+              >
+                <option value="">Impressora padrão do sistema</option>
+                {desktopPrinters.map((printer) => (
+                  <option key={printer.name} value={printer.name}>
+                    {printer.name}
+                    {printer.isDefault ? ' (padrão)' : ''}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button
+              type="button"
+              onClick={handleTestPrint}
+              disabled={printerBusy}
+              className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-60"
+            >
+              {printerBusy ? 'Imprimindo...' : 'Imprimir teste'}
+            </button>
+          </div>
+          {printerError && (
+            <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
+              {printerError}
+            </p>
+          )}
+        </div>
+      )}
 
       <form
         onSubmit={changePassword}

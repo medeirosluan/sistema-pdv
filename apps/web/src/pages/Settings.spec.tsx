@@ -30,6 +30,9 @@ const setupTwoFactorMock = vi.hoisted(() => vi.fn())
 const enableTwoFactorMock = vi.hoisted(() => vi.fn())
 const disableTwoFactorMock = vi.hoisted(() => vi.fn())
 const changePasswordMock = vi.hoisted(() => vi.fn())
+const isTauriMock = vi.hoisted(() => vi.fn(() => false))
+const listPrintersMock = vi.hoisted(() => vi.fn())
+const printRawMock = vi.hoisted(() => vi.fn())
 
 vi.mock('../lib/useAuth', () => ({
   useAuth: () => ({
@@ -84,6 +87,12 @@ vi.mock('../lib/api', async (importOriginal) => {
     },
   }
 })
+
+vi.mock('../lib/tauri', () => ({
+  isTauri: isTauriMock,
+  listPrinters: listPrintersMock,
+  printRaw: printRawMock,
+}))
 
 function makeTenant() {
   return {
@@ -148,6 +157,10 @@ describe('Settings', () => {
     enableTwoFactorMock.mockReset()
     disableTwoFactorMock.mockReset()
     changePasswordMock.mockReset()
+    isTauriMock.mockReset().mockReturnValue(false)
+    listPrintersMock.mockReset().mockResolvedValue([])
+    printRawMock.mockReset().mockResolvedValue(undefined)
+    localStorage.clear()
   })
 
   it('carrega e preenche os dados da loja', async () => {
@@ -333,5 +346,83 @@ describe('Settings', () => {
     expect(screen.getByText('Permissões por papel')).toBeInTheDocument()
     expect(screen.getByText('Vender no PDV')).toBeInTheDocument()
     expect(screen.getByText('Definir proprietários')).toBeInTheDocument()
+  })
+
+  describe('impressora do cupom (app desktop)', () => {
+    it('não mostra a seção de impressora fora do app desktop (navegador/PWA)', async () => {
+      render(<Settings />)
+      await screen.findByDisplayValue('Loja Demo')
+
+      expect(
+        screen.queryByText('Impressora do cupom (app desktop)'),
+      ).not.toBeInTheDocument()
+      expect(listPrintersMock).not.toHaveBeenCalled()
+    })
+
+    it('lista as impressoras instaladas quando roda no app desktop', async () => {
+      isTauriMock.mockReturnValue(true)
+      listPrintersMock.mockResolvedValue([
+        { name: 'EPSON TM-T20', isDefault: true },
+        { name: 'Microsoft Print to PDF', isDefault: false },
+      ])
+      render(<Settings />)
+      await screen.findByDisplayValue('Loja Demo')
+
+      expect(
+        await screen.findByText('EPSON TM-T20 (padrão)'),
+      ).toBeInTheDocument()
+      expect(screen.getByText('Microsoft Print to PDF')).toBeInTheDocument()
+    })
+
+    it('salva a impressora escolhida e a mantém selecionada', async () => {
+      const user = userEvent.setup()
+      isTauriMock.mockReturnValue(true)
+      listPrintersMock.mockResolvedValue([
+        { name: 'EPSON TM-T20', isDefault: true },
+      ])
+      render(<Settings />)
+      await screen.findByDisplayValue('Loja Demo')
+      const select = await screen.findByLabelText('Impressora')
+
+      await user.selectOptions(select, 'EPSON TM-T20')
+
+      expect(localStorage.getItem('pdv.printerName')).toBe('EPSON TM-T20')
+    })
+
+    it('envia um teste de impressão para a impressora selecionada', async () => {
+      const user = userEvent.setup()
+      isTauriMock.mockReturnValue(true)
+      listPrintersMock.mockResolvedValue([
+        { name: 'EPSON TM-T20', isDefault: true },
+      ])
+      render(<Settings />)
+      await screen.findByDisplayValue('Loja Demo')
+      const select = await screen.findByLabelText('Impressora')
+      await user.selectOptions(select, 'EPSON TM-T20')
+
+      await user.click(screen.getByRole('button', { name: 'Imprimir teste' }))
+
+      await waitFor(() => {
+        expect(printRawMock).toHaveBeenCalledWith(
+          'EPSON TM-T20',
+          expect.any(Uint8Array),
+        )
+      })
+    })
+
+    it('mostra o erro quando o teste de impressão falha', async () => {
+      const user = userEvent.setup()
+      isTauriMock.mockReturnValue(true)
+      listPrintersMock.mockResolvedValue([])
+      printRawMock.mockRejectedValue(new Error('Impressora não encontrada'))
+      render(<Settings />)
+      await screen.findByDisplayValue('Loja Demo')
+
+      await user.click(screen.getByRole('button', { name: 'Imprimir teste' }))
+
+      expect(
+        await screen.findByText('Impressora não encontrada'),
+      ).toBeInTheDocument()
+    })
   })
 })

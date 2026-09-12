@@ -1,5 +1,8 @@
+import { buildReceiptEscPos } from './escpos';
 import { formatBRL, formatDateTime } from './format';
+import { getPreferredPrinter } from './printerSettings';
 import { paymentMethodLabels, type Sale } from './sales';
+import { isTauri, printRaw } from './tauri';
 
 export interface ReceiptOptions {
   storeName: string;
@@ -143,6 +146,17 @@ export function buildReceiptHtml(sale: Sale, options: ReceiptOptions): string {
 }
 
 export function printReceipt(sale: Sale, options: ReceiptOptions): void {
+  if (isTauri()) {
+    const data = buildReceiptEscPos(sale, options);
+    printRaw(getPreferredPrinter(), data).catch((err) => {
+      console.error('Falha ao imprimir cupom na impressora térmica:', err);
+      window.alert(
+        'Não foi possível imprimir o cupom. Verifique a impressora nas Configurações.',
+      );
+    });
+    return;
+  }
+
   const iframe = document.createElement('iframe');
   iframe.setAttribute('aria-hidden', 'true');
   iframe.style.position = 'fixed';
