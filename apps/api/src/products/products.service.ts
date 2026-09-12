@@ -94,11 +94,13 @@ export class ProductsService {
       );
     }
 
+    const sku = dto.sku?.trim() || (await this.generateSku(tenantId));
+
     return this.prisma.product.create({
       data: {
         tenantId,
         name: dto.name.trim(),
-        sku: dto.sku?.trim() || null,
+        sku,
         barcode: dto.barcode?.trim() || null,
         price: dto.price,
         cost: dto.cost ?? null,
@@ -272,7 +274,6 @@ export class ProductsService {
       const data = {
         name,
         barcode,
-        sku,
         price,
         cost,
         unit,
@@ -286,7 +287,8 @@ export class ProductsService {
         if (existing) {
           await this.prisma.product.update({
             where: { id: existing.id },
-            data,
+            // uma linha sem SKU não deve apagar o SKU que o produto já tinha
+            data: { ...data, ...(sku ? { sku } : {}) },
           });
           updated += 1;
         } else {
@@ -298,7 +300,13 @@ export class ProductsService {
             );
             continue;
           }
-          await this.prisma.product.create({ data: { tenantId, ...data } });
+          await this.prisma.product.create({
+            data: {
+              tenantId,
+              ...data,
+              sku: sku ?? (await this.generateSku(tenantId)),
+            },
+          });
           created += 1;
         }
       } catch {
@@ -330,6 +338,30 @@ export class ProductsService {
       throw new NotFoundException('Produto não encontrado');
     }
     return product;
+  }
+
+  /**
+   * Gera um SKU sequencial ("SKU-000123") quando o usuário não informa um.
+   * Confere disponibilidade e tenta o próximo número em caso de colisão,
+   * já que sku não tem constraint de unicidade no banco (diferente do
+   * barcode) e a contagem usada como base pode ficar defasada sob
+   * concorrência.
+   */
+  private async generateSku(tenantId: string): Promise<string> {
+    const base = await this.prisma.product.count({ where: { tenantId } });
+    for (let attempt = 0; attempt < 1000; attempt += 1) {
+      const candidate = `SKU-${String(base + 1 + attempt).padStart(6, '0')}`;
+      const exists = await this.prisma.product.findFirst({
+        where: { tenantId, sku: candidate },
+        select: { id: true },
+      });
+      if (!exists) {
+        return candidate;
+      }
+    }
+    throw new ConflictException(
+      'Não foi possível gerar um SKU automático; informe um manualmente',
+    );
   }
 
   private async ensureParent(

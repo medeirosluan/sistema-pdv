@@ -121,6 +121,60 @@ describe('ProductsService', () => {
       );
     });
 
+    it('gera um SKU sequencial quando nenhum é informado', async () => {
+      prisma.product.findFirst.mockResolvedValue(null); // candidato de SKU disponível
+      prisma.product.count.mockResolvedValue(5);
+      prisma.product.create.mockResolvedValue({ id: 'p1' });
+
+      await service.create('tenant-1', {
+        name: 'Produto X',
+        price: 10,
+      } as never);
+
+      expect(prisma.product.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ sku: 'SKU-000006' }),
+        }),
+      );
+    });
+
+    it('tenta o próximo número quando o SKU candidato já está em uso', async () => {
+      prisma.product.findFirst
+        .mockResolvedValueOnce({ id: 'existing' }) // SKU-000001 já existe
+        .mockResolvedValueOnce(null); // SKU-000002 disponível
+      prisma.product.count.mockResolvedValue(0);
+      prisma.product.create.mockResolvedValue({ id: 'p1' });
+
+      await service.create('tenant-1', {
+        name: 'Produto X',
+        price: 10,
+      } as never);
+
+      expect(prisma.product.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ sku: 'SKU-000002' }),
+        }),
+      );
+    });
+
+    it('não gera SKU quando um é informado explicitamente', async () => {
+      prisma.product.findFirst.mockResolvedValue(null);
+      prisma.product.create.mockResolvedValue({ id: 'p1' });
+
+      await service.create('tenant-1', {
+        name: 'Produto X',
+        price: 10,
+        sku: 'MEU-SKU',
+      } as never);
+
+      expect(prisma.product.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ sku: 'MEU-SKU' }),
+        }),
+      );
+      expect(prisma.product.count).not.toHaveBeenCalled();
+    });
+
     it('lança NotFoundException quando a categoria informada não existe', async () => {
       prisma.category.findFirst.mockResolvedValue(null);
 
@@ -173,10 +227,10 @@ describe('ProductsService', () => {
     });
 
     it('cria a variação vinculada ao produto base', async () => {
-      prisma.product.findFirst.mockResolvedValue({
-        id: 'parent-1',
-        parentId: null,
-      }); // ensureParent
+      prisma.product.findFirst
+        .mockResolvedValueOnce({ id: 'parent-1', parentId: null }) // ensureParent
+        .mockResolvedValue(null); // generateSku: candidato de SKU disponível
+      prisma.product.count.mockResolvedValue(0);
       prisma.product.create.mockResolvedValue({ id: 'variant-1' });
 
       await service.create('tenant-1', {
@@ -330,6 +384,58 @@ describe('ProductsService', () => {
       );
       expect(result.updated).toBe(1);
       expect(result.created).toBe(0);
+    });
+
+    it('gera um SKU para um produto novo quando a linha do CSV não informa um', async () => {
+      prisma.product.findFirst.mockResolvedValue(null);
+      prisma.product.count.mockResolvedValue(0);
+      prisma.product.create.mockResolvedValue({ id: 'created' });
+
+      const csv = ['nome,preco', 'Produto Novo,10.00'].join('\n');
+      await service.importCsv('tenant-1', csv);
+
+      expect(prisma.product.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ sku: 'SKU-000001' }),
+        }),
+      );
+    });
+
+    it('preserva o SKU existente quando a linha de atualização não informa um', async () => {
+      prisma.product.findFirst.mockResolvedValue({
+        id: 'existing-id',
+        sku: 'SKU-ANTIGO',
+      });
+      prisma.product.update.mockResolvedValue({ id: 'existing-id' });
+
+      const csv = [
+        'nome,preco,codigo_barras',
+        'Produto Existente,20.00,789',
+      ].join('\n');
+      await service.importCsv('tenant-1', csv);
+
+      const updateCall = prisma.product.update.mock.calls[0][0];
+      expect(updateCall.data).not.toHaveProperty('sku');
+    });
+
+    it('atualiza o SKU quando a linha de atualização informa um novo valor', async () => {
+      prisma.product.findFirst.mockResolvedValue({
+        id: 'existing-id',
+        sku: 'SKU-ANTIGO',
+      });
+      prisma.product.update.mockResolvedValue({ id: 'existing-id' });
+
+      const csv = [
+        'nome,preco,codigo_barras,sku',
+        'Produto Existente,20.00,789,SKU-NOVO',
+      ].join('\n');
+      await service.importCsv('tenant-1', csv);
+
+      expect(prisma.product.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ sku: 'SKU-NOVO' }),
+        }),
+      );
     });
 
     it('para de criar novos produtos ao atingir o limite do plano, mas mantém as atualizações', async () => {
