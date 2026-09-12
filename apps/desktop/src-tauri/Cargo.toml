@@ -1,6 +1,6 @@
 [package]
 name = "sistema-pdv"
-version = "0.1.1"
+version = "0.1.2"
 description = "Sistema PDV desktop"
 authors = ["Sistema PDV"]
 edition = "2021"
