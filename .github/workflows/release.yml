@@ -1,0 +1,48 @@
+name: Release Desktop
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  release:
+    runs-on: windows-latest
+    env:
+      DATABASE_URL: postgresql://user:pass@localhost:5432/db
+      JWT_SECRET: ci-secret-please-change-0123456789
+      JWT_REFRESH_SECRET: ci-refresh-secret-0123456789
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Instalar Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Gerar Prisma Client
+        run: npm run prisma:generate --workspace apps/api
+
+      - name: Build do frontend web
+        run: npm run build --workspace apps/web
+
+      - name: Build e publicação do instalador
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          projectPath: apps/desktop
+          tagName: ${{ github.ref_name }}
+          releaseName: 'Sistema PDV ${{ github.ref_name }}'
+          releaseDraft: true
+          prerelease: false
+          includeUpdaterJson: true

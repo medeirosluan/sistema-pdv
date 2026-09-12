@@ -24,3 +24,6 @@ apps/api/src/generated/
 
 # Backups do banco (produção)
 backups/
+
+# Chave privada de assinatura do auto-updater (NUNCA commitar)
+tauri-updater.key

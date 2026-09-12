@@ -19,7 +19,15 @@ import {
   subscriptionStatusLabels,
   type SubscriptionInfo,
 } from '../lib/subscription';
-import { isTauri, listPrinters, printRaw, type PrinterInfo } from '../lib/tauri';
+import {
+  checkForUpdate,
+  installUpdateAndRestart,
+  isTauri,
+  listPrinters,
+  printRaw,
+  type PrinterInfo,
+  type UpdateInfo,
+} from '../lib/tauri';
 import { PLANS, tenantApi, type PlanInfo, type PlanKey } from '../lib/tenant';
 
 const inputClass =
@@ -78,6 +86,11 @@ export function Settings() {
   const [printerBusy, setPrinterBusy] = useState(false);
   const [printerError, setPrinterError] = useState<string | null>(null);
 
+  const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
+  const [updateChecked, setUpdateChecked] = useState(false);
+  const [updateBusy, setUpdateBusy] = useState(false);
+  const [updateError, setUpdateError] = useState<string | null>(null);
+
   const can = useCan();
   const canEdit = can('settings.manage');
 
@@ -93,6 +106,35 @@ export function Settings() {
   function handlePrinterChange(name: string) {
     setSelectedPrinter(name);
     setPreferredPrinter(name || null);
+  }
+
+  async function handleCheckUpdate() {
+    setUpdateBusy(true);
+    setUpdateError(null);
+    try {
+      const update = await checkForUpdate();
+      setUpdateInfo(update);
+      setUpdateChecked(true);
+    } catch (err) {
+      setUpdateError(
+        err instanceof Error ? err.message : 'Erro ao verificar atualização',
+      );
+    } finally {
+      setUpdateBusy(false);
+    }
+  }
+
+  async function handleInstallUpdate() {
+    setUpdateBusy(true);
+    setUpdateError(null);
+    try {
+      await installUpdateAndRestart();
+    } catch (err) {
+      setUpdateError(
+        err instanceof Error ? err.message : 'Erro ao instalar atualização',
+      );
+      setUpdateBusy(false);
+    }
   }
 
   async function handleTestPrint() {
@@ -764,6 +806,64 @@ export function Settings() {
           {printerError && (
             <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
               {printerError}
+            </p>
+          )}
+        </div>
+      )}
+
+      {isTauri() && (
+        <div className="rounded-2xl border border-slate-200 bg-white p-6">
+          <h3 className="text-base font-semibold text-slate-900">
+            Atualizações do app
+          </h3>
+          <p className="mt-1 text-sm text-slate-500">
+            Verifica se há uma nova versão do Sistema PDV disponível.
+          </p>
+
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={handleCheckUpdate}
+              disabled={updateBusy}
+              className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-60"
+            >
+              {updateBusy && !updateInfo
+                ? 'Verificando...'
+                : 'Verificar atualização'}
+            </button>
+
+            {updateChecked && !updateInfo && (
+              <span className="text-sm text-slate-500">
+                Você já está na versão mais recente.
+              </span>
+            )}
+
+            {updateInfo && (
+              <>
+                <span className="text-sm text-slate-700">
+                  Nova versão disponível:{' '}
+                  <strong>{updateInfo.version}</strong> (atual:{' '}
+                  {updateInfo.currentVersion})
+                </span>
+                <button
+                  type="button"
+                  onClick={handleInstallUpdate}
+                  disabled={updateBusy}
+                  className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
+                >
+                  {updateBusy ? 'Instalando...' : 'Instalar e reiniciar'}
+                </button>
+              </>
+            )}
+          </div>
+          {updateInfo?.body && (
+            <p className="mt-3 whitespace-pre-line text-sm text-slate-500">
+              {updateInfo.body}
+            </p>
+          )}
+          {updateError && (
+            <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
+              {updateError}
             </p>
           )}
         </div>

@@ -1,12 +1,26 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 const invokeMock = vi.hoisted(() => vi.fn())
+const checkMock = vi.hoisted(() => vi.fn())
+const relaunchMock = vi.hoisted(() => vi.fn())
 
 vi.mock('@tauri-apps/api/core', () => ({
   invoke: invokeMock,
 }))
+vi.mock('@tauri-apps/plugin-updater', () => ({
+  check: checkMock,
+}))
+vi.mock('@tauri-apps/plugin-process', () => ({
+  relaunch: relaunchMock,
+}))
 
-import { isTauri, listPrinters, printRaw } from './tauri'
+import {
+  checkForUpdate,
+  installUpdateAndRestart,
+  isTauri,
+  listPrinters,
+  printRaw,
+} from './tauri'
 
 describe('isTauri', () => {
   afterEach(() => {
@@ -64,5 +78,57 @@ describe('printRaw', () => {
       printerName: undefined,
       data: [9],
     })
+  })
+})
+
+describe('checkForUpdate', () => {
+  it('retorna null quando não há atualização', async () => {
+    checkMock.mockReset().mockResolvedValue(null)
+
+    expect(await checkForUpdate()).toBeNull()
+  })
+
+  it('retorna os dados da atualização quando disponível', async () => {
+    checkMock.mockReset().mockResolvedValue({
+      version: '0.2.0',
+      currentVersion: '0.1.0',
+      body: 'Correções de bugs',
+      downloadAndInstall: vi.fn(),
+    })
+
+    const result = await checkForUpdate()
+
+    expect(result).toEqual({
+      version: '0.2.0',
+      currentVersion: '0.1.0',
+      body: 'Correções de bugs',
+    })
+  })
+})
+
+describe('installUpdateAndRestart', () => {
+  it('rejeita quando não há atualização pendente', async () => {
+    checkMock.mockReset().mockResolvedValue(null)
+    await checkForUpdate()
+
+    await expect(installUpdateAndRestart()).rejects.toThrow(
+      'Nenhuma atualização pendente',
+    )
+  })
+
+  it('baixa, instala e reinicia quando há atualização pendente', async () => {
+    const downloadAndInstall = vi.fn().mockResolvedValue(undefined)
+    checkMock.mockReset().mockResolvedValue({
+      version: '0.2.0',
+      currentVersion: '0.1.0',
+      downloadAndInstall,
+    })
+    relaunchMock.mockReset().mockResolvedValue(undefined)
+
+    await checkForUpdate()
+    await installUpdateAndRestart()
+
+    expect(downloadAndInstall).toHaveBeenCalled()
+    expect(relaunchMock).toHaveBeenCalled()
   })
 })
