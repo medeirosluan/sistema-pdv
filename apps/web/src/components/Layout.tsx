@@ -10,6 +10,7 @@ import {
   Minimize2,
   Package,
   Receipt,
+  RefreshCw,
   Settings,
   ShieldCheck,
   ShoppingCart,
@@ -18,7 +19,7 @@ import {
   Wallet,
   type LucideIcon,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/useAuth';
 import type { UserRole } from '../lib/api';
@@ -113,6 +114,7 @@ export function Layout() {
   const [passwordOpen, setPasswordOpen] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const { canInstall, install } = useInstallPrompt();
 
   useEffect(() => {
@@ -139,16 +141,37 @@ export function Layout() {
     };
   }, [user?.tenant.id]);
 
-  useEffect(() => {
-    if (online && user?.tenant.id) {
-      const tenantId = user.tenant.id;
-      Promise.all([
+  const runSync = useCallback(async (tenantId: string) => {
+    setSyncing(true);
+    try {
+      await Promise.all([
         refreshCatalog(tenantId),
         syncPendingSales(tenantId),
         syncPendingCashMovements(tenantId),
-      ]).catch(() => undefined);
+      ]);
+    } catch {
+      // uma falha de rede aqui é esperada (ex.: sinal instável); a próxima
+      // tentativa periódica ou manual cobre o que não sincronizou agora.
+    } finally {
+      setSyncing(false);
     }
-  }, [online, user?.tenant.id]);
+  }, []);
+
+  useEffect(() => {
+    if (!online || !user?.tenant.id) {
+      return;
+    }
+    const tenantId = user.tenant.id;
+    void (async () => {
+      await runSync(tenantId);
+    })();
+    // Nova tentativa periódica: uma falha de rede durante a sincronização
+    // (ex.: sinal instável) interrompe a fila sem esperar o navegador
+    // reportar "offline" de verdade, então sem isso os itens pendentes
+    // ficariam parados até a próxima recarga da página.
+    const interval = window.setInterval(() => void runSync(tenantId), 120_000);
+    return () => window.clearInterval(interval);
+  }, [online, user?.tenant.id, runSync]);
 
   const visibleNavItems = navItems.filter(
     (item) =>
@@ -292,8 +315,21 @@ export function Layout() {
               </button>
             )}
             {pendingCount > 0 && (
-              <span className="rounded-full bg-sky-100 px-3 py-1 text-xs font-medium text-sky-700">
+              <span className="flex items-center gap-1.5 rounded-full bg-sky-100 px-3 py-1 text-xs font-medium text-sky-700">
                 {pendingCount} pendente(s)
+                {online && (
+                  <button
+                    type="button"
+                    onClick={() => user?.tenant.id && void runSync(user.tenant.id)}
+                    disabled={syncing}
+                    title="Sincronizar agora"
+                    className="text-sky-700 transition hover:text-sky-900 disabled:opacity-50"
+                  >
+                    <RefreshCw
+                      className={`h-3.5 w-3.5 ${syncing ? 'animate-spin' : ''}`}
+                    />
+                  </button>
+                )}
               </span>
             )}
             {!online && (

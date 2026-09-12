@@ -16,6 +16,7 @@ const cashAddMovementMock = vi.hoisted(() => vi.fn())
 const cashHistoryMock = vi.hoisted(() => vi.fn())
 const confirmMock = vi.hoisted(() => vi.fn(async () => true))
 const toastMock = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn(), info: vi.fn() }))
+const addPendingCashMovementMock = vi.hoisted(() => vi.fn(async () => undefined))
 
 vi.mock('../lib/useAuth', () => ({
   useAuth: () => ({
@@ -51,7 +52,7 @@ vi.mock('../lib/cash', async (importOriginal) => {
 })
 
 vi.mock('../lib/offline/cashQueue', () => ({
-  addPendingCashMovement: vi.fn(),
+  addPendingCashMovement: addPendingCashMovementMock,
   listPendingCashMovements: vi.fn(async () => []),
 }))
 
@@ -102,6 +103,7 @@ describe('CashRegister', () => {
     })
     confirmMock.mockReset().mockResolvedValue(true)
     toastMock.success.mockReset()
+    addPendingCashMovementMock.mockReset().mockResolvedValue(undefined)
   })
 
   it('mostra o formulário de abertura quando não há caixa aberto', async () => {
@@ -155,12 +157,54 @@ describe('CashRegister', () => {
     await user.click(screen.getByRole('button', { name: 'Registrar movimento' }))
 
     await waitFor(() => {
-      expect(cashAddMovementMock).toHaveBeenCalledWith({
-        type: 'WITHDRAWAL',
-        amount: 50,
-        reason: 'Troco',
-      })
+      expect(cashAddMovementMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          clientId: expect.any(String),
+          type: 'WITHDRAWAL',
+          amount: 50,
+          reason: 'Troco',
+        }),
+      )
     })
+  })
+
+  it('envia um clientId para permitir retentativa segura sem duplicar o movimento', async () => {
+    const user = userEvent.setup()
+    cashCurrentMock.mockResolvedValue(openRegister())
+    cashAddMovementMock.mockResolvedValue({})
+    render(<CashRegister />)
+    await screen.findByText('Caixa aberto')
+
+    await user.type(screen.getByPlaceholderText('Valor'), '10')
+    await user.click(screen.getByRole('button', { name: 'Registrar movimento' }))
+
+    await waitFor(() => expect(cashAddMovementMock).toHaveBeenCalled())
+    const [call] = cashAddMovementMock.mock.calls[0]
+    expect(call.clientId).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+    )
+  })
+
+  it('enfileira o movimento para sincronizar depois quando a chamada online falha por rede', async () => {
+    const user = userEvent.setup()
+    cashCurrentMock.mockResolvedValue(openRegister())
+    cashAddMovementMock.mockRejectedValue(new TypeError('Failed to fetch'))
+    render(<CashRegister />)
+    await screen.findByText('Caixa aberto')
+
+    await user.type(screen.getByPlaceholderText('Valor'), '30')
+    await user.click(screen.getByRole('button', { name: 'Registrar movimento' }))
+
+    await waitFor(() => {
+      expect(addPendingCashMovementMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tenantId: 'tenant-1',
+          type: 'WITHDRAWAL',
+          amount: 30,
+        }),
+      )
+    })
+    expect(screen.queryByText('Erro ao registrar movimento')).not.toBeInTheDocument()
   })
 
   it('mostra a diferença ao digitar o valor de fechamento', async () => {
@@ -246,5 +290,16 @@ describe('CashRegister', () => {
     render(<CashRegister />)
 
     expect(await screen.findByText('Fechado')).toBeInTheDocument()
+  })
+
+  it('recarrega o resumo quando uma sincronização em segundo plano altera a fila pendente', async () => {
+    cashCurrentMock.mockResolvedValue(openRegister())
+    render(<CashRegister />)
+    await screen.findByText('Caixa aberto')
+    expect(cashCurrentMock).toHaveBeenCalledTimes(1)
+
+    window.dispatchEvent(new Event('pdv-pending-changed'))
+
+    await waitFor(() => expect(cashCurrentMock).toHaveBeenCalledTimes(2))
   })
 })

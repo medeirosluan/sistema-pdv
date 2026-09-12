@@ -21,6 +21,7 @@ import {
   listPendingCashMovements,
 } from '../lib/offline/cashQueue';
 import { getMeta, setMeta } from '../lib/offline/db';
+import { onPendingChanged } from '../lib/offline/salesQueue';
 import { useHotkeys } from '../lib/useHotkeys';
 import {
   cashApi,
@@ -131,6 +132,15 @@ export function CashRegister() {
     })();
   }, [loadCurrent, loadHistory]);
 
+  useEffect(() => {
+    // quando uma sincronização em segundo plano (ex.: ao voltar a ficar
+    // online) altera a fila de movimentos pendentes, atualiza o resumo do
+    // caixa para refletir o que já foi sincronizado.
+    return onPendingChanged(() => {
+      void loadCurrent();
+    });
+  }, [loadCurrent]);
+
   async function handleOpen(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setBusy(true);
@@ -154,30 +164,33 @@ export function CashRegister() {
     const tenantId = user?.tenant.id ?? '';
     const amount = parseNumber(movementAmount);
     const reason = movementReason.trim() || undefined;
+    const clientId = crypto.randomUUID();
     try {
       if (!navigator.onLine) {
+        throw new TypeError('offline');
+      }
+      await cashApi.addMovement({ clientId, type: movementType, amount, reason });
+      setMovementAmount('');
+      setMovementReason('');
+      await loadCurrent();
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setError(err.message);
+      } else {
+        // sem rede (ou request falhou mesmo com navigator.onLine): enfileira
+        // para sincronizar depois, igual ao fluxo de vendas do PDV.
         await addPendingCashMovement({
-          clientId: crypto.randomUUID(),
+          clientId,
           tenantId,
           type: movementType,
           amount,
           reason,
           createdAt: new Date().toISOString(),
         });
-      } else {
-        await cashApi.addMovement({
-          type: movementType,
-          amount,
-          reason,
-        });
+        setMovementAmount('');
+        setMovementReason('');
+        await loadCurrent();
       }
-      setMovementAmount('');
-      setMovementReason('');
-      await loadCurrent();
-    } catch (err) {
-      setError(
-        err instanceof ApiError ? err.message : 'Erro ao registrar movimento',
-      );
     } finally {
       setBusy(false);
     }
