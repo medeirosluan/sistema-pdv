@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { endOfDayLocal, startOfDayLocal } from '../common/date-range.js';
 import { Prisma } from '../generated/prisma/client.js';
-import { SaleStatus } from '../generated/prisma/enums.js';
+import { SaleStatus, StockMovementType } from '../generated/prisma/enums.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import { CreateSaleDto } from './dto/create-sale.dto.js';
@@ -177,9 +177,23 @@ export class SalesService {
 
       for (const item of itemsData) {
         if (item.productId) {
-          await tx.product.update({
+          const updatedProduct = await tx.product.update({
             where: { id: item.productId },
             data: { stock: { decrement: item.quantity } },
+            select: { stock: true },
+          });
+          const newStock = Number(updatedProduct.stock);
+          await tx.stockMovement.create({
+            data: {
+              tenantId,
+              productId: item.productId,
+              type: StockMovementType.OUT,
+              quantity: item.quantity,
+              previousStock: newStock + item.quantity,
+              newStock,
+              reason: `Venda #${number}`,
+              createdById: userId,
+            },
           });
         }
       }
@@ -213,9 +227,24 @@ export class SalesService {
 
       for (const item of sale.items) {
         if (item.productId) {
-          await tx.product.update({
+          const quantity = Number(item.quantity);
+          const updatedProduct = await tx.product.update({
             where: { id: item.productId },
-            data: { stock: { increment: item.quantity } },
+            data: { stock: { increment: quantity } },
+            select: { stock: true },
+          });
+          const newStock = Number(updatedProduct.stock);
+          await tx.stockMovement.create({
+            data: {
+              tenantId,
+              productId: item.productId,
+              type: StockMovementType.IN,
+              quantity,
+              previousStock: newStock - quantity,
+              newStock,
+              reason: `Cancelamento da venda #${sale.number}`,
+              createdById: actor.userId,
+            },
           });
         }
       }

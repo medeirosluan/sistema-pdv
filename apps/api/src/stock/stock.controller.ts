@@ -17,11 +17,13 @@ import { StockService } from './stock.service.js';
 export class StockController {
   constructor(private readonly stockService: StockService) {}
 
+  @RequirePermission('products.view')
   @Get('low-stock')
   lowStock(@CurrentUser() user: AuthUser) {
     return this.stockService.lowStock(user.tenantId);
   }
 
+  @RequirePermission('products.view')
   @Get('movements')
   listMovements(
     @CurrentUser() user: AuthUser,
@@ -30,6 +32,7 @@ export class StockController {
     return this.stockService.listMovements(user.tenantId, query);
   }
 
+  @RequirePermission('products.view')
   @Get('products/:productId/movements')
   productMovements(
     @CurrentUser() user: AuthUser,

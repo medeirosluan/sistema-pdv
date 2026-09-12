@@ -171,7 +171,8 @@ export function Dashboard() {
         <div className="flex items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
           <AlertTriangle className="h-4 w-4 shrink-0" />
           <span>
-            {summary.products.lowStock} produto(s) com estoque baixo (≤ 5).
+            {summary.products.lowStock} produto(s) com estoque abaixo ou igual
+            ao mínimo definido.
           </span>
           <Link
             to="/produtos"
