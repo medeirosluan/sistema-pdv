@@ -47,7 +47,11 @@ npm run dev
 
 - API: http://localhost:3000/api
 - Health check (testa o banco): http://localhost:3000/api/health
+- Documentação da API (Swagger): http://localhost:3000/docs
 - Web: http://localhost:5173
+
+> Em produção o Swagger fica **desativado por padrão**. Para habilitar, defina
+> `ENABLE_SWAGGER=true` no `.env`.
 
 ## Scripts (raiz)
 
@@ -62,6 +66,19 @@ npm run dev
 | `npm run db:up` / `db:down` | Sobe/derruba o PostgreSQL |
 | `npm run prisma:migrate` | Cria/aplica migration |
 | `npm run prisma:studio` | Abre o Prisma Studio |
+| `npm run db:seed` | Popula uma loja de demonstração (catálogo, clientes, usuário) |
+
+### Dados de demonstração
+
+```bash
+npm run db:seed
+```
+
+Cria (se não existir) a loja `loja-demonstracao` com categorias, produtos,
+clientes e um usuário OWNER (`demo@sistemapdv.com` / `Demo@1234`). É seguro
+rodar de novo — não duplica dados. Se o slug já existir com vendas
+registradas (loja real), o script aborta em vez de misturar dados nela; use
+`SEED_TENANT_SLUG=outro-slug npm run db:seed` para escolher outro slug.
 
 ## Deploy (produção)
 

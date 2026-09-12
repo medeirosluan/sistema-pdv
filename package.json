@@ -18,7 +18,8 @@
     "db:up": "docker compose up -d db",
     "db:down": "docker compose down",
     "prisma:migrate": "npm run prisma:migrate --workspace apps/api",
-    "prisma:studio": "npm run prisma:studio --workspace apps/api"
+    "prisma:studio": "npm run prisma:studio --workspace apps/api",
+    "db:seed": "npm run db:seed --workspace apps/api"
   },
   "devDependencies": {
     "concurrently": "^9.1.0"

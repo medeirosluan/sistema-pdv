@@ -1,5 +1,6 @@
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 import { AppModule } from './app.module.js';
 import { createRateLimiter } from './common/rate-limit.middleware.js';
@@ -48,6 +49,22 @@ async function bootstrap() {
       transform: true,
     }),
   );
+
+  const isProduction = process.env.NODE_ENV === 'production';
+  const swaggerEnabled = !isProduction || process.env.ENABLE_SWAGGER === 'true';
+  if (swaggerEnabled) {
+    const config = new DocumentBuilder()
+      .setTitle('Sistema PDV — API')
+      .setDescription(
+        'API do Sistema PDV (multi-tenant). Rotas autenticadas exigem o header ' +
+          '`Authorization: Bearer <accessToken>` obtido em `/api/auth/login`.',
+      )
+      .setVersion('1.0')
+      .addBearerAuth()
+      .build();
+    const document = SwaggerModule.createDocument(app, config);
+    SwaggerModule.setup('docs', app, document);
+  }
 
   await app.listen(process.env.PORT ?? 3000);
 }

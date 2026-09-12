@@ -26,7 +26,7 @@ Legenda: `[ ]` pendente · `[~]` em andamento · `[x]` concluído
 - [x] Auditoria (registro de ações sensíveis + página de consulta)
 - [x] 2FA (TOTP) — ativar/desativar + login com código
 - [x] RLS no Postgres (políticas por tenant + role de app não-superuser + transação por requisição)
-- [ ] Swagger/OpenAPI em `/docs`
+- [x] Swagger/OpenAPI em `/docs`
 - [x] CI (lint + build + testes) no GitHub Actions
 - [x] Testes unitários (permissões, validação de env)
 
@@ -131,4 +131,4 @@ Legenda: `[ ]` pendente · `[~]` em andamento · `[x]` concluído
 
 - [ ] Padronizar mensagens de erro da API
 - [ ] Paginação e ordenação padronizadas nas listagens
-- [ ] Seed de dados de demonstração
+- [x] Seed de dados de demonstração
