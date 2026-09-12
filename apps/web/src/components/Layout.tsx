@@ -42,6 +42,7 @@ import { useCan, type Permission } from '../lib/permissions';
 import { useInstallPrompt } from '../lib/useInstallPrompt';
 import { useHotkeys } from '../lib/useHotkeys';
 import { ChangePasswordModal } from './ChangePasswordModal';
+import { UpdateBanner } from './UpdateBanner';
 
 interface NavItem {
   to: string;
@@ -385,6 +386,7 @@ export function Layout() {
         open={passwordOpen}
         onClose={() => setPasswordOpen(false)}
       />
+      <UpdateBanner />
     </div>
   );
 }
