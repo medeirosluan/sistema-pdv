@@ -6,7 +6,11 @@ import {
 } from '@nestjs/common';
 import { endOfDayLocal, startOfDayLocal } from '../common/date-range.js';
 import { Prisma } from '../generated/prisma/client.js';
-import { SaleStatus, StockMovementType } from '../generated/prisma/enums.js';
+import {
+  CashRegisterStatus,
+  SaleStatus,
+  StockMovementType,
+} from '../generated/prisma/enums.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import { CreateSaleDto } from './dto/create-sale.dto.js';
@@ -81,6 +85,13 @@ export class SalesService {
       if (existing) {
         return existing;
       }
+    }
+
+    const openRegister = await this.prisma.cashRegister.findFirst({
+      where: { tenantId, status: CashRegisterStatus.OPEN },
+    });
+    if (!openRegister) {
+      throw new ConflictException('Abra o caixa antes de registrar uma venda');
     }
 
     if (dto.customerId) {

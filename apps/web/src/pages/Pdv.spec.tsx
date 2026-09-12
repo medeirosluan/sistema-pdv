@@ -1,6 +1,8 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { MemoryRouter } from 'react-router-dom'
+import type { CurrentCashRegister } from '../lib/cash'
 import type { Product } from '../lib/catalog'
 import type { Sale } from '../lib/sales'
 import { Pdv } from './Pdv'
@@ -35,6 +37,9 @@ const customersListMock = vi.hoisted(() => vi.fn())
 const addPendingSaleMock = vi.hoisted(() => vi.fn())
 const printReceiptMock = vi.hoisted(() => vi.fn())
 const confirmMock = vi.hoisted(() => vi.fn(async () => true))
+const cashCurrentMock = vi.hoisted(() =>
+  vi.fn<() => Promise<CurrentCashRegister | null>>(),
+)
 
 vi.mock('../lib/useAuth', () => ({
   useAuth: () => ({
@@ -89,6 +94,10 @@ vi.mock('../lib/offline/salesQueue', () => ({
 
 vi.mock('../lib/receipt', () => ({
   printReceipt: printReceiptMock,
+}))
+
+vi.mock('../lib/cash', () => ({
+  cashApi: { current: cashCurrentMock },
 }))
 
 function product(overrides: Partial<Product> = {}): Product {
@@ -162,11 +171,15 @@ describe('Pdv', () => {
     addPendingSaleMock.mockReset()
     printReceiptMock.mockReset()
     confirmMock.mockReset().mockResolvedValue(true)
+    cashCurrentMock.mockReset().mockResolvedValue({
+      register: { id: 'reg-1', status: 'OPEN' },
+      summary: {},
+    } as unknown as CurrentCashRegister)
     vi.stubGlobal('navigator', { ...navigator, onLine: true })
   })
 
   it('mostra a mensagem inicial pedindo para buscar um produto', () => {
-    render(<Pdv />)
+    render(<MemoryRouter><Pdv /></MemoryRouter>)
     expect(
       screen.getByText('Digite o nome ou o código para buscar produtos.'),
     ).toBeInTheDocument()
@@ -175,7 +188,7 @@ describe('Pdv', () => {
 
   it('busca produtos após digitar e permite adicionar ao carrinho', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
-    render(<Pdv />)
+    render(<MemoryRouter><Pdv /></MemoryRouter>)
 
     await searchAndAddProduct(user)
 
@@ -198,7 +211,7 @@ describe('Pdv', () => {
       pageSize: 24,
       totalPages: 1,
     })
-    render(<Pdv />)
+    render(<MemoryRouter><Pdv /></MemoryRouter>)
 
     const searchInput = screen.getByPlaceholderText(
       'Buscar ou bipar código de barras — F2',
@@ -221,7 +234,7 @@ describe('Pdv', () => {
 
   it('atualiza a quantidade e o total ao clicar em + no carrinho', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
-    render(<Pdv />)
+    render(<MemoryRouter><Pdv /></MemoryRouter>)
     await searchAndAddProduct(user)
 
     const cartItem = screen.getAllByText('Água Mineral 500ml')[1].closest('li')
@@ -234,7 +247,7 @@ describe('Pdv', () => {
 
   it('remove o produto do carrinho pelo botão de lixeira', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
-    render(<Pdv />)
+    render(<MemoryRouter><Pdv /></MemoryRouter>)
     await searchAndAddProduct(user)
 
     const cartItem = screen.getAllByText('Água Mineral 500ml')[1].closest('li')
@@ -245,7 +258,7 @@ describe('Pdv', () => {
   })
 
   it('desabilita finalizar quando o carrinho está vazio', () => {
-    render(<Pdv />)
+    render(<MemoryRouter><Pdv /></MemoryRouter>)
     expect(
       screen.getByRole('button', { name: /Finalizar venda/ }),
     ).toBeDisabled()
@@ -254,7 +267,7 @@ describe('Pdv', () => {
   it('finaliza a venda com sucesso via pagamento e mostra a confirmação', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
     salesCreateMock.mockResolvedValue(sale())
-    render(<Pdv />)
+    render(<MemoryRouter><Pdv /></MemoryRouter>)
     await searchAndAddProduct(user)
 
     await user.click(screen.getByRole('button', { name: /Pagamento/ }))
@@ -272,10 +285,24 @@ describe('Pdv', () => {
     expect(screen.getByText('Adicione produtos ao carrinho.')).toBeInTheDocument()
   })
 
+  it('bloqueia a venda e avisa quando o caixa está fechado', async () => {
+    cashCurrentMock.mockResolvedValueOnce(null)
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    render(<MemoryRouter><Pdv /></MemoryRouter>)
+    await searchAndAddProduct(user)
+
+    expect(
+      await screen.findByText('Caixa fechado — abra o caixa antes de vender.'),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: /Finalizar venda/ }),
+    ).toBeDisabled()
+  })
+
   it('guarda a venda offline quando a API falha por conexão', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
     salesCreateMock.mockRejectedValue(new TypeError('Failed to fetch'))
-    render(<Pdv />)
+    render(<MemoryRouter><Pdv /></MemoryRouter>)
     await searchAndAddProduct(user)
 
     await user.click(screen.getByRole('button', { name: /Pagamento/ }))
@@ -294,7 +321,7 @@ describe('Pdv', () => {
 
   it('cancela a venda atual após confirmação, esvaziando o carrinho', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
-    render(<Pdv />)
+    render(<MemoryRouter><Pdv /></MemoryRouter>)
     await searchAndAddProduct(user)
 
     confirmMock.mockResolvedValue(true)

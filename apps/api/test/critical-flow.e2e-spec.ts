@@ -145,6 +145,17 @@ describe('Fluxo crítico do PDV (e2e)', () => {
     expect(res.body.register.status).toBe('CLOSED');
   });
 
+  it('recusa vender com o caixa fechado', async () => {
+    await request(app.getHttpServer())
+      .post('/api/sales')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        items: [{ productId, quantity: 1 }],
+        payments: [{ method: 'CASH', amount: 25.5 }],
+      })
+      .expect(409);
+  });
+
   it('não abre um segundo caixa sem fechar o anterior primeiro (caixa já fechado, então abre normalmente)', async () => {
     const res = await request(app.getHttpServer())
       .post('/api/cash-register/open')

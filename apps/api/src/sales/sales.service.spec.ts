@@ -33,6 +33,9 @@ function createPrismaMock(tx: ReturnType<typeof createTxMock>) {
     customer: {
       findFirst: vi.fn(),
     },
+    cashRegister: {
+      findFirst: vi.fn().mockResolvedValue({ id: 'register-1', status: 'OPEN' }),
+    },
     $transaction: vi.fn(async (fn: (tx: unknown) => unknown) => fn(tx)),
   };
 }
@@ -102,6 +105,19 @@ describe('SalesService', () => {
 
       expect(tx.stockMovement.create).not.toHaveBeenCalled();
       expect(tx.product.update).not.toHaveBeenCalled();
+    });
+
+    it('recusa a venda quando não há caixa aberto', async () => {
+      prisma.cashRegister.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.create('tenant-1', 'user-1', {
+          items: [{ description: 'Item avulso', quantity: 1, unitPrice: 15 }],
+          payments: [{ method: PaymentMethod.CASH, amount: 15 }],
+        } as never),
+      ).rejects.toThrow('Abra o caixa antes de registrar uma venda');
+
+      expect(tx.sale.create).not.toHaveBeenCalled();
     });
   });
 

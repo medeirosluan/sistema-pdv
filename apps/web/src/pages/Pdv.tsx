@@ -1,6 +1,7 @@
 import {
   CheckCircle2,
   Keyboard,
+  Lock,
   Maximize2,
   Minimize2,
   Minus,
@@ -17,11 +18,13 @@ import {
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
 } from 'react';
+import { Link } from 'react-router-dom';
 import { CustomerPicker } from '../components/CustomerPicker';
 import { Modal } from '../components/Modal';
 import { useConfirm } from '../components/ui/useConfirm';
 import { PaymentModal } from '../components/PaymentModal';
 import { ApiError } from '../lib/api';
+import { cashApi } from '../lib/cash';
 import { useAuth } from '../lib/useAuth';
 import { productDisplayName, productsApi, type Product } from '../lib/catalog';
 import type { Customer } from '../lib/customers';
@@ -92,6 +95,24 @@ export function Pdv() {
   const [paymentOpen, setPaymentOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
   const discountRef = useRef<HTMLInputElement>(null);
+  // null = ainda não sabemos (carregando, ou offline sem cache) — não bloqueia
+  // a venda para não travar o operador quando a checagem falha.
+  const [cashOpen, setCashOpen] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    cashApi
+      .current()
+      .then((current) => {
+        if (active) {
+          setCashOpen(current !== null);
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     const timeout = setTimeout(() => setDebounced(search.trim()), 300);
@@ -403,6 +424,10 @@ export function Pdv() {
 
   async function finalize() {
     if (cart.length === 0) {
+      return;
+    }
+    if (cashOpen === false) {
+      setError('Abra o caixa antes de registrar uma venda');
       return;
     }
     const settings = user?.tenant.settings ?? {};
@@ -746,6 +771,21 @@ export function Pdv() {
             </span>
           </div>
 
+          {cashOpen === false && (
+            <div className="flex items-center gap-2 border-b border-amber-100 bg-amber-50 px-5 py-3 text-sm text-amber-800">
+              <Lock className="h-4 w-4 shrink-0" />
+              <span className="flex-1">
+                Caixa fechado — abra o caixa antes de vender.
+              </span>
+              <Link
+                to="/caixa"
+                className="rounded-lg border border-amber-300 px-2 py-1 text-xs font-semibold text-amber-800 transition hover:bg-amber-100"
+              >
+                Abrir caixa
+              </Link>
+            </div>
+          )}
+
           {lastSale && (
             <div className="flex items-center gap-2 border-b border-brand-100 bg-brand-50 px-5 py-3 text-sm text-brand-700">
               <CheckCircle2 className="h-4 w-4 shrink-0" />
@@ -905,7 +945,10 @@ export function Pdv() {
               type="button"
               onClick={finalize}
               disabled={
-                cart.length === 0 || submitting || (total > 0 && remaining > 0)
+                cart.length === 0 ||
+                submitting ||
+                cashOpen === false ||
+                (total > 0 && remaining > 0)
               }
               className="w-full rounded-lg bg-brand-600 py-3 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
