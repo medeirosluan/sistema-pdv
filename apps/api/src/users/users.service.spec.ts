@@ -136,6 +136,21 @@ describe('UsersService', () => {
         expect.objectContaining({ action: 'user.create' }),
       );
     });
+
+    it('rejeita conceder ao novo usuário uma permissão que o ator não possui', async () => {
+      prisma.user.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.create('tenant-1', manager(), {
+          name: 'Novo',
+          email: 'novo@example.com',
+          password: 'Senha123',
+          role: UserRole.CASHIER,
+          permissions: ['owners.manage'],
+        } as never),
+      ).rejects.toThrow(ForbiddenException);
+      expect(prisma.user.create).not.toHaveBeenCalled();
+    });
   });
 
   describe('update', () => {
@@ -179,6 +194,63 @@ describe('UsersService', () => {
           role: UserRole.OWNER,
         } as never),
       ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('rejeita conceder a outro usuário uma permissão que o ator não possui', async () => {
+      prisma.user.findFirst.mockResolvedValue({
+        id: 'u1',
+        role: UserRole.CASHIER,
+        email: 'u1@example.com',
+      });
+
+      await expect(
+        service.update('tenant-1', manager(), 'u1', {
+          permissions: ['owners.manage'],
+        } as never),
+      ).rejects.toThrow(ForbiddenException);
+      expect(prisma.user.update).not.toHaveBeenCalled();
+    });
+
+    it('rejeita o próprio usuário alterar seu papel (bloqueia a escalação de privilégio em duas etapas)', async () => {
+      await expect(
+        service.update('tenant-1', manager(), 'manager-1', {
+          role: UserRole.OWNER,
+        } as never),
+      ).rejects.toThrow(ForbiddenException);
+      expect(prisma.user.findFirst).not.toHaveBeenCalled();
+    });
+
+    it('rejeita o próprio usuário alterar suas próprias permissões', async () => {
+      await expect(
+        service.update('tenant-1', manager(), 'manager-1', {
+          permissions: ['owners.manage'],
+        } as never),
+      ).rejects.toThrow(ForbiddenException);
+      expect(prisma.user.findFirst).not.toHaveBeenCalled();
+    });
+
+    it('permite conceder uma permissão que o ator já possui', async () => {
+      prisma.user.findFirst.mockResolvedValue({
+        id: 'u1',
+        role: UserRole.CASHIER,
+        email: 'u1@example.com',
+      });
+      prisma.user.update.mockResolvedValue({
+        id: 'u1',
+        name: 'U1',
+        email: 'u1@example.com',
+        role: UserRole.CASHIER,
+        active: true,
+        permissionOverrides: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+
+      await service.update('tenant-1', manager(), 'u1', {
+        permissions: ['users.manage'],
+      } as never);
+
+      expect(prisma.user.update).toHaveBeenCalled();
     });
   });
 

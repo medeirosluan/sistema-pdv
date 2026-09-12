@@ -101,6 +101,9 @@ export class UsersService {
 
   async create(tenantId: string, actor: AuthUser, dto: CreateUserDto) {
     this.assertCanAssignRole(actor, dto.role);
+    if (dto.permissions !== undefined) {
+      this.assertCanGrantPermissions(actor, dto.permissions);
+    }
     await this.ensureEmailAvailable(tenantId, dto.email);
 
     const { limits, usage, name } =
@@ -144,6 +147,15 @@ export class UsersService {
     id: string,
     dto: UpdateUserDto,
   ) {
+    if (
+      id === actor.userId &&
+      (dto.role !== undefined || dto.permissions !== undefined)
+    ) {
+      throw new ForbiddenException(
+        'Você não pode alterar seu próprio papel ou permissões',
+      );
+    }
+
     const user = await this.prisma.user.findFirst({
       where: { id, tenantId },
     });
@@ -156,6 +168,10 @@ export class UsersService {
       if (user.role === UserRole.OWNER) {
         await this.ensureNotLastOwner(tenantId, user.id);
       }
+    }
+
+    if (dto.permissions !== undefined) {
+      this.assertCanGrantPermissions(actor, dto.permissions);
     }
 
     if (dto.email && dto.email.toLowerCase() !== user.email) {
@@ -258,6 +274,17 @@ export class UsersService {
     if (role === UserRole.OWNER && !canManageOwners) {
       throw new ForbiddenException(
         'Apenas quem pode definir proprietários pode atribuir este papel',
+      );
+    }
+  }
+
+  private assertCanGrantPermissions(actor: AuthUser, desired: Permission[]) {
+    const notOwned = desired.filter(
+      (permission) => !actor.permissions.includes(permission),
+    );
+    if (notOwned.length > 0) {
+      throw new ForbiddenException(
+        'Você não pode conceder permissões que não possui',
       );
     }
   }

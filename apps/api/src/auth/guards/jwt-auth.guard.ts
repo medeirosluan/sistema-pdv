@@ -82,6 +82,9 @@ export class JwtAuthGuard implements CanActivate {
     if (!user || !user.active) {
       throw new UnauthorizedException('Usuário inválido ou inativo');
     }
+    if (payload.ver !== undefined && payload.ver !== user.tokenVersion) {
+      throw new UnauthorizedException('Sessão encerrada');
+    }
     if (user.tenant.status !== TenantStatus.ACTIVE) {
       throw new UnauthorizedException('Loja inativa ou suspensa');
     }
