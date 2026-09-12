@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '../lib/api'
 import type { CloseResult, CurrentCashRegister } from '../lib/cash'
+import type { PendingCashClose, PendingCashOpen } from '../lib/offline/cashQueue'
 import { CashRegister } from './CashRegister'
 
 const authState = vi.hoisted(() => ({
@@ -19,8 +20,12 @@ const toastMock = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn(), info: vi
 const addPendingCashMovementMock = vi.hoisted(() => vi.fn(async () => undefined))
 const setPendingCashOpenMock = vi.hoisted(() => vi.fn(async () => undefined))
 const setPendingCashCloseMock = vi.hoisted(() => vi.fn(async () => undefined))
-const getPendingCashOpenMock = vi.hoisted(() => vi.fn(async () => null))
-const getPendingCashCloseMock = vi.hoisted(() => vi.fn(async () => null))
+const getPendingCashOpenMock = vi.hoisted(() =>
+  vi.fn<() => Promise<PendingCashOpen | null>>(async () => null),
+)
+const getPendingCashCloseMock = vi.hoisted(() =>
+  vi.fn<() => Promise<PendingCashClose | null>>(async () => null),
+)
 
 vi.mock('../lib/useAuth', () => ({
   useAuth: () => ({
