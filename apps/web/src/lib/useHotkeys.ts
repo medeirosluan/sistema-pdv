@@ -1,10 +1,13 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef } from 'react';
 
 export type HotkeyMap = Record<string, (event: KeyboardEvent) => void>;
 
 export function useHotkeys(map: HotkeyMap, enabled = true): void {
   const mapRef = useRef(map);
-  mapRef.current = map;
+
+  useLayoutEffect(() => {
+    mapRef.current = map;
+  });
 
   useEffect(() => {
     if (!enabled) {
