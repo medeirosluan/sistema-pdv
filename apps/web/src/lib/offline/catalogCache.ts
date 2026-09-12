@@ -65,6 +65,29 @@ export function getLastSync(tenantId: string): Promise<string | undefined> {
   return getMeta(`lastSync:${tenantId}`);
 }
 
+/**
+ * Apaga o cache local de catálogo/clientes de um tenant (dados pessoais
+ * como nome/CPF/telefone ficam no IndexedDB do navegador). Chamado no
+ * logout para não deixar esses dados no computador depois que o operador
+ * sai — especialmente relevante em PCs compartilhados entre operadores.
+ *
+ * NÃO apaga vendas/movimentos de caixa pendentes de sincronizar: esses
+ * precisam sobreviver a um logout para não perder a venda feita offline.
+ */
+export async function clearTenantCache(tenantId: string): Promise<void> {
+  await offlineDb.transaction(
+    'rw',
+    offlineDb.products,
+    offlineDb.customers,
+    offlineDb.meta,
+    async () => {
+      await offlineDb.products.where('tenantId').equals(tenantId).delete();
+      await offlineDb.customers.where('tenantId').equals(tenantId).delete();
+      await offlineDb.meta.delete(`lastSync:${tenantId}`);
+    },
+  );
+}
+
 export async function searchCachedProducts(
   tenantId: string,
   term: string,

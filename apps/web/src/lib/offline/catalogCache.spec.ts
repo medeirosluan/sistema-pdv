@@ -23,6 +23,7 @@ vi.mock('../customers', async (importOriginal) => {
 })
 
 import {
+  clearTenantCache,
   getLastSync,
   refreshCatalog,
   searchCachedCustomers,
@@ -74,6 +75,7 @@ describe('catalogCache', () => {
     await offlineDb.products.clear()
     await offlineDb.customers.clear()
     await offlineDb.meta.clear()
+    await offlineDb.pendingSales.clear()
   })
 
   describe('refreshCatalog', () => {
@@ -162,6 +164,65 @@ describe('catalogCache', () => {
         .equals('outro-tenant')
         .toArray()
       expect(outros).toHaveLength(1)
+    })
+  })
+
+  describe('clearTenantCache', () => {
+    it('apaga produtos, clientes e o registro de última sincronização do tenant', async () => {
+      await offlineDb.products.put({ ...makeProduct({ id: 'p1' }), tenantId: 'tenant-1' })
+      await offlineDb.customers.put({ ...makeCustomer({ id: 'c1' }), tenantId: 'tenant-1' })
+      await offlineDb.meta.put({ key: 'lastSync:tenant-1', value: '2026-01-01' })
+
+      await clearTenantCache('tenant-1')
+
+      expect(
+        await offlineDb.products.where('tenantId').equals('tenant-1').toArray(),
+      ).toEqual([])
+      expect(
+        await offlineDb.customers.where('tenantId').equals('tenant-1').toArray(),
+      ).toEqual([])
+      expect(await getLastSync('tenant-1')).toBeUndefined()
+    })
+
+    it('não afeta o cache de outro tenant', async () => {
+      await offlineDb.products.put({ ...makeProduct({ id: 'p1' }), tenantId: 'tenant-1' })
+      await offlineDb.products.put({ ...makeProduct({ id: 'p2' }), tenantId: 'outro-tenant' })
+      await offlineDb.customers.put({ ...makeCustomer({ id: 'c2' }), tenantId: 'outro-tenant' })
+
+      await clearTenantCache('tenant-1')
+
+      expect(
+        await offlineDb.products.where('tenantId').equals('outro-tenant').toArray(),
+      ).toHaveLength(1)
+      expect(
+        await offlineDb.customers.where('tenantId').equals('outro-tenant').toArray(),
+      ).toHaveLength(1)
+    })
+
+    it('não apaga vendas ou movimentos de caixa pendentes de sincronizar', async () => {
+      await offlineDb.pendingSales.put({
+        clientId: 'sale-1',
+        tenantId: 'tenant-1',
+        createdAt: '2026-01-01',
+        payload: { items: [], payments: [] },
+        sale: {
+          id: 'sale-1',
+          number: 0,
+          status: 'FINISHED',
+          subtotal: 0,
+          discount: 0,
+          total: 0,
+          customer: null,
+          createdBy: { id: 'u1', name: 'Operador' },
+          items: [],
+          payments: [],
+          createdAt: '2026-01-01',
+        },
+      })
+
+      await clearTenantCache('tenant-1')
+
+      expect(await offlineDb.pendingSales.get('sale-1')).toBeDefined()
     })
   })
 

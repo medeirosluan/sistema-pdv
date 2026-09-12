@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { api, tokenStore, type UserInfo } from './api';
 import { applyBrandColor } from './brand';
 import { AuthContext, type AuthContextValue } from './authContext';
+import { clearTenantCache } from './offline/catalogCache';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserInfo | null>(null);
@@ -49,6 +50,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       },
       logout: () => {
         api.logout().catch(() => undefined);
+        if (user) {
+          clearTenantCache(user.tenant.id).catch(() => undefined);
+        }
         tokenStore.clear();
         setUser(null);
       },
