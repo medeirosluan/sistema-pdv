@@ -99,6 +99,11 @@ docker compose -f docker-compose.prod.yml up -d --build
 
 **Admin da plataforma:** defina os e-mails em `PLATFORM_ADMIN_EMAILS` no `.env.prod` — eles enxergam o menu **Admin**.
 
+**Monitoramento de erros (Sentry):** defina `SENTRY_DSN` (API) e `VITE_SENTRY_DSN`
+(Web/Desktop) no `.env.prod` — sem eles, o Sentry fica desativado. Use projetos
+separados para API e Web. Só erros inesperados (5xx / exceções não tratadas)
+são reportados; erros de validação/negócio (400, 401, 404 etc.) não geram ruído.
+
 **App desktop (Windows):** gere o instalador apontando para a API de produção:
 
 ```bash

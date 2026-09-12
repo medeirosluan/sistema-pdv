@@ -1,3 +1,5 @@
+import { Sentry } from './sentry';
+
 export interface TenantSettings {
   receiptWidth?: '58mm' | '80mm';
   autoPrint?: boolean;
@@ -120,7 +122,13 @@ async function request<T>(
   }
 
   if (!response.ok) {
-    throw new ApiError(response.status, await extractError(response));
+    const message = await extractError(response);
+    if (response.status >= 500) {
+      Sentry.captureException(new ApiError(response.status, message), {
+        extra: { path, status: response.status },
+      });
+    }
+    throw new ApiError(response.status, message);
   }
 
   if (response.status === 204) {

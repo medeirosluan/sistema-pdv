@@ -37,6 +37,7 @@ jobs:
         run: npm run build --workspace apps/web
         env:
           VITE_API_URL: ${{ vars.VITE_API_URL || 'http://localhost:3000' }}
+          VITE_SENTRY_DSN: ${{ vars.VITE_SENTRY_DSN }}
 
       - name: Build e publicação do instalador
         uses: tauri-apps/tauri-action@v0

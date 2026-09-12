@@ -1,13 +1,17 @@
+import './instrument.js';
+
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 import { AppModule } from './app.module.js';
+import { SentryExceptionFilter } from './common/sentry.filter.js';
 import { createRateLimiter } from './common/rate-limit.middleware.js';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  app.useGlobalFilters(new SentryExceptionFilter());
   app.use(helmet());
   app.use(createRateLimiter({ windowMs: 60_000, max: 300 }));
   app.use(

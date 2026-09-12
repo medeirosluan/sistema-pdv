@@ -122,7 +122,7 @@ Legenda: `[ ]` pendente · `[~]` em andamento · `[x]` concluído
 - [x] Docker de produção (Dockerfiles + compose + nginx + Caddy/HTTPS)
 - [x] Bootstrap do admin da plataforma (PLATFORM_ADMIN_EMAILS)
 - [x] Backup automático do banco (serviço `backup` no compose + retenção)
-- [ ] Observabilidade (logs estruturados / captura de erros)
+- [x] Observabilidade (captura de erros via Sentry — API e Web/Desktop)
 - [x] Recuperação de senha (fluxo completo; SMTP opcional)
 - [ ] Confirmação de e-mail
 - [ ] Convites de equipe e recibo por e-mail

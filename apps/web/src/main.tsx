@@ -7,7 +7,10 @@ import { AuthProvider } from './lib/auth.tsx';
 import { ConfirmProvider } from './components/ui/ConfirmDialog.tsx';
 import { ErrorBoundary } from './components/ErrorBoundary.tsx';
 import { KioskProvider } from './lib/kiosk.tsx';
+import { initSentry } from './lib/sentry.ts';
 import { ToastProvider } from './components/ui/Toast.tsx';
+
+initSentry();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
