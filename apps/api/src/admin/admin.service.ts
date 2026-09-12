@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { AuditService } from '../audit/audit.service.js';
 import { Prisma } from '../generated/prisma/client.js';
 import { TenantStatus } from '../generated/prisma/enums.js';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -7,7 +8,10 @@ import { UpdateTenantAdminDto } from './dto/update-tenant-admin.dto.js';
 
 @Injectable()
 export class AdminService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly audit: AuditService,
+  ) {}
 
   async summary() {
     const [tenants, activeTenants, users, products, sales] =
@@ -57,17 +61,31 @@ export class AdminService {
     };
   }
 
-  async updateTenant(id: string, dto: UpdateTenantAdminDto) {
+  async updateTenant(
+    id: string,
+    dto: UpdateTenantAdminDto,
+    actor: { userId: string; email: string },
+  ) {
     const tenant = await this.prisma.tenant.findUnique({ where: { id } });
     if (!tenant) {
       throw new NotFoundException('Loja não encontrada');
     }
-    return this.prisma.tenant.update({
+    const updated = await this.prisma.tenant.update({
       where: { id },
       data: {
         ...(dto.plan !== undefined && { plan: dto.plan }),
         ...(dto.status !== undefined && { status: dto.status }),
       },
     });
+    await this.audit.log({
+      tenantId: id,
+      userId: actor.userId,
+      userName: actor.email,
+      action: 'admin.tenant.update',
+      entity: 'Tenant',
+      entityId: id,
+      metadata: { plan: dto.plan, status: dto.status },
+    });
+    return updated;
   }
 }

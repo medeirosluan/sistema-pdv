@@ -3,6 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { AuditService } from '../audit/audit.service.js';
 import { Prisma } from '../generated/prisma/client.js';
 import {
   CashMovementType,
@@ -32,14 +33,22 @@ const registerInclude = {
 
 @Injectable()
 export class CashRegisterService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly audit: AuditService,
+  ) {}
 
-  async open(tenantId: string, userId: string, dto: OpenCashRegisterDto) {
+  async open(
+    tenantId: string,
+    userId: string,
+    dto: OpenCashRegisterDto,
+    actor: { email: string },
+  ) {
     const existing = await this.findOpen(tenantId);
     if (existing) {
       throw new ConflictException('Já existe um caixa aberto');
     }
-    return this.prisma.cashRegister.create({
+    const register = await this.prisma.cashRegister.create({
       data: {
         tenantId,
         openedById: userId,
@@ -48,6 +57,16 @@ export class CashRegisterService {
       },
       include: registerInclude,
     });
+    await this.audit.log({
+      tenantId,
+      userId,
+      userName: actor.email,
+      action: 'cash.open',
+      entity: 'CashRegister',
+      entityId: register.id,
+      metadata: { openingAmount: dto.openingAmount },
+    });
+    return register;
   }
 
   async current(tenantId: string) {
@@ -65,7 +84,11 @@ export class CashRegisterService {
     return { register, summary };
   }
 
-  async close(tenantId: string, dto: CloseCashRegisterDto) {
+  async close(
+    tenantId: string,
+    dto: CloseCashRegisterDto,
+    actor: { userId: string; email: string },
+  ) {
     const register = await this.findOpenDetailed(tenantId);
     if (!register) {
       throw new NotFoundException('Nenhum caixa aberto');
@@ -90,14 +113,33 @@ export class CashRegisterService {
       include: registerInclude,
     });
 
+    const difference = round2(dto.closingAmount - summary.expectedCash);
+    await this.audit.log({
+      tenantId,
+      userId: actor.userId,
+      userName: actor.email,
+      action: 'cash.close',
+      entity: 'CashRegister',
+      entityId: register.id,
+      metadata: {
+        closingAmount: dto.closingAmount,
+        expectedCash: summary.expectedCash,
+        difference,
+      },
+    });
+
     return {
       register: updated,
       summary,
-      difference: round2(dto.closingAmount - summary.expectedCash),
+      difference,
     };
   }
 
-  async addMovement(tenantId: string, dto: CreateCashMovementDto) {
+  async addMovement(
+    tenantId: string,
+    dto: CreateCashMovementDto,
+    actor: { userId: string; email: string },
+  ) {
     if (dto.clientId) {
       const existing = await this.prisma.cashMovement.findUnique({
         where: { clientId: dto.clientId },
@@ -112,7 +154,7 @@ export class CashRegisterService {
     if (!register) {
       throw new NotFoundException('Nenhum caixa aberto');
     }
-    return this.prisma.cashMovement.create({
+    const movement = await this.prisma.cashMovement.create({
       data: {
         cashRegisterId: register.id,
         clientId: dto.clientId ?? null,
@@ -121,6 +163,18 @@ export class CashRegisterService {
         reason: dto.reason ?? null,
       },
     });
+    await this.audit.log({
+      tenantId,
+      userId: actor.userId,
+      userName: actor.email,
+      action: dto.type === CashMovementType.WITHDRAWAL
+        ? 'cash.withdrawal'
+        : 'cash.deposit',
+      entity: 'CashMovement',
+      entityId: movement.id,
+      metadata: { amount: dto.amount, reason: dto.reason ?? null },
+    });
+    return movement;
   }
 
   async history(tenantId: string, query: QueryCashRegisterDto) {

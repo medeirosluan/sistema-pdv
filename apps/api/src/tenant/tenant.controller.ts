@@ -25,7 +25,10 @@ export class TenantController {
   @RequirePermission('settings.manage')
   @Patch()
   update(@CurrentUser() user: AuthUser, @Body() dto: UpdateTenantDto) {
-    return this.tenantService.update(user.tenantId, dto);
+    return this.tenantService.update(user.tenantId, dto, {
+      userId: user.userId,
+      email: user.email,
+    });
   }
 
   @Roles(UserRole.OWNER)
@@ -34,6 +37,9 @@ export class TenantController {
     @CurrentUser() user: AuthUser,
     @Body() dto: UpdateTenantPlanDto,
   ) {
-    return this.tenantService.changePlan(user.tenantId, dto.plan);
+    return this.tenantService.changePlan(user.tenantId, dto.plan, {
+      userId: user.userId,
+      email: user.email,
+    });
   }
 }

@@ -4,6 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { endOfDayLocal, startOfDayLocal } from '../common/date-range.js';
 import { Prisma } from '../generated/prisma/client.js';
 import { SaleStatus } from '../generated/prisma/enums.js';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -35,8 +36,8 @@ export class SalesService {
     }
     if (query.from || query.to) {
       where.createdAt = {
-        ...(query.from ? { gte: new Date(query.from) } : {}),
-        ...(query.to ? { lte: new Date(query.to) } : {}),
+        ...(query.from ? { gte: startOfDayLocal(query.from) } : {}),
+        ...(query.to ? { lte: endOfDayLocal(query.to) } : {}),
       };
     }
 
@@ -187,7 +188,11 @@ export class SalesService {
     });
   }
 
-  async cancel(tenantId: string, id: string) {
+  async cancel(
+    tenantId: string,
+    id: string,
+    actor: { userId: string; email: string },
+  ) {
     const sale = await this.prisma.sale.findFirst({
       where: { id, tenantId },
       include: { items: true },
@@ -217,6 +222,8 @@ export class SalesService {
 
       await this.audit.log({
         tenantId,
+        userId: actor.userId,
+        userName: actor.email,
         action: 'sale.cancel',
         entity: 'Sale',
         entityId: sale.id,

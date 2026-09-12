@@ -1,5 +1,5 @@
 import { X } from 'lucide-react';
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useId, useRef, type ReactNode } from 'react';
 
 interface ModalProps {
   open: boolean;
@@ -10,6 +10,9 @@ interface ModalProps {
 }
 
 export function Modal({ open, title, onClose, children, footer }: ModalProps) {
+  const titleId = useId();
+  const panelRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     if (!open) {
       return;
@@ -23,6 +26,12 @@ export function Modal({ open, title, onClose, children, footer }: ModalProps) {
     return () => document.removeEventListener('keydown', handleKey);
   }, [open, onClose]);
 
+  useEffect(() => {
+    if (open) {
+      panelRef.current?.focus();
+    }
+  }, [open]);
+
   if (!open) {
     return null;
   }
@@ -33,14 +42,22 @@ export function Modal({ open, title, onClose, children, footer }: ModalProps) {
       onClick={onClose}
     >
       <div
-        className="w-full max-w-lg rounded-2xl bg-white shadow-xl"
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
+        className="w-full max-w-lg rounded-2xl bg-white shadow-xl outline-none"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
-          <h2 className="text-base font-semibold text-slate-900">{title}</h2>
+          <h2 id={titleId} className="text-base font-semibold text-slate-900">
+            {title}
+          </h2>
           <button
             type="button"
             onClick={onClose}
+            aria-label="Fechar"
             className="rounded-lg p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
           >
             <X className="h-5 w-5" />

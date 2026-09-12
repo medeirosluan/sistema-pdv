@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { endOfDayLocal, startOfDayLocal } from '../common/date-range.js';
 import { PaymentMethod, SaleStatus } from '../generated/prisma/enums.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { QuerySalesReportDto } from './dto/query-sales-report.dto.js';
@@ -158,9 +159,9 @@ export class ReportsService {
     tenantId: string,
     dto: QuerySalesReportDto,
   ): Promise<SalesReport> {
-    const to = dto.to ? endOfDay(new Date(dto.to)) : new Date();
+    const to = dto.to ? endOfDayLocal(dto.to) : new Date();
     const from = dto.from
-      ? startOfDay(new Date(dto.from))
+      ? startOfDayLocal(dto.from)
       : startOfDay(addDays(to, -29));
 
     const sales = await this.prisma.sale.findMany({
@@ -281,18 +282,6 @@ function addDays(date: Date, days: number): Date {
 
 function startOfDay(date: Date): Date {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate());
-}
-
-function endOfDay(date: Date): Date {
-  return new Date(
-    date.getFullYear(),
-    date.getMonth(),
-    date.getDate(),
-    23,
-    59,
-    59,
-    999,
-  );
 }
 
 function dateKey(date: Date): string {

@@ -22,7 +22,11 @@ export class TenantService {
     return tenant;
   }
 
-  async update(tenantId: string, dto: UpdateTenantDto) {
+  async update(
+    tenantId: string,
+    dto: UpdateTenantDto,
+    actor: { userId: string; email: string },
+  ) {
     const tenant = await this.get(tenantId);
     const currentSettings =
       (tenant.settings as Record<string, unknown> | null) ?? {};
@@ -44,13 +48,19 @@ export class TenantService {
         }),
       },
     });
-    await this.auditUpdate(tenantId, Object.keys(dto));
+    await this.auditUpdate(tenantId, Object.keys(dto), actor);
     return updated;
   }
 
-  private async auditUpdate(tenantId: string, changes: string[]) {
+  private async auditUpdate(
+    tenantId: string,
+    changes: string[],
+    actor: { userId: string; email: string },
+  ) {
     await this.audit.log({
       tenantId,
+      userId: actor.userId,
+      userName: actor.email,
       action: 'tenant.update',
       entity: 'Tenant',
       entityId: tenantId,
@@ -80,7 +90,11 @@ export class TenantService {
     };
   }
 
-  async changePlan(tenantId: string, plan: TenantPlan) {
+  async changePlan(
+    tenantId: string,
+    plan: TenantPlan,
+    actor: { userId: string; email: string },
+  ) {
     await this.get(tenantId);
     const tenant = await this.prisma.tenant.update({
       where: { id: tenantId },
@@ -88,6 +102,8 @@ export class TenantService {
     });
     await this.audit.log({
       tenantId,
+      userId: actor.userId,
+      userName: actor.email,
       action: 'tenant.plan',
       entity: 'Tenant',
       entityId: tenantId,

@@ -38,6 +38,9 @@ export class SalesController {
   @RequirePermission('sales.cancel')
   @Post(':id/cancel')
   cancel(@CurrentUser() user: AuthUser, @Param('id') id: string) {
-    return this.salesService.cancel(user.tenantId, id);
+    return this.salesService.cancel(user.tenantId, id, {
+      userId: user.userId,
+      email: user.email,
+    });
   }
 }

@@ -18,6 +18,11 @@ const actionLabels: Record<string, string> = {
   'sale.cancel': 'Venda cancelada',
   'tenant.update': 'Configurações alteradas',
   'tenant.plan': 'Plano alterado',
+  'cash.open': 'Caixa aberto',
+  'cash.close': 'Caixa fechado',
+  'cash.withdrawal': 'Sangria registrada',
+  'cash.deposit': 'Suprimento registrado',
+  'admin.tenant.update': 'Loja alterada (admin)',
 };
 
 function describe(log: AuditLog): string {

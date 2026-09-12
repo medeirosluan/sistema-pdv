@@ -7,6 +7,8 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
+import { CurrentUser } from '../auth/decorators/current-user.decorator.js';
+import type { AuthUser } from '../auth/types/auth-user.js';
 import { AdminService } from './admin.service.js';
 import { QueryTenantsDto } from './dto/query-tenants.dto.js';
 import { UpdateTenantAdminDto } from './dto/update-tenant-admin.dto.js';
@@ -29,9 +31,13 @@ export class AdminController {
 
   @Patch('tenants/:id')
   updateTenant(
+    @CurrentUser() user: AuthUser,
     @Param('id') id: string,
     @Body() dto: UpdateTenantAdminDto,
   ) {
-    return this.adminService.updateTenant(id, dto);
+    return this.adminService.updateTenant(id, dto, {
+      userId: user.userId,
+      email: user.email,
+    });
   }
 }
