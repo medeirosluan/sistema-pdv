@@ -17,6 +17,10 @@ const cashHistoryMock = vi.hoisted(() => vi.fn())
 const confirmMock = vi.hoisted(() => vi.fn(async () => true))
 const toastMock = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn(), info: vi.fn() }))
 const addPendingCashMovementMock = vi.hoisted(() => vi.fn(async () => undefined))
+const setPendingCashOpenMock = vi.hoisted(() => vi.fn(async () => undefined))
+const setPendingCashCloseMock = vi.hoisted(() => vi.fn(async () => undefined))
+const getPendingCashOpenMock = vi.hoisted(() => vi.fn(async () => null))
+const getPendingCashCloseMock = vi.hoisted(() => vi.fn(async () => null))
 
 vi.mock('../lib/useAuth', () => ({
   useAuth: () => ({
@@ -54,6 +58,10 @@ vi.mock('../lib/cash', async (importOriginal) => {
 vi.mock('../lib/offline/cashQueue', () => ({
   addPendingCashMovement: addPendingCashMovementMock,
   listPendingCashMovements: vi.fn(async () => []),
+  setPendingCashOpen: setPendingCashOpenMock,
+  setPendingCashClose: setPendingCashCloseMock,
+  getPendingCashOpen: getPendingCashOpenMock,
+  getPendingCashClose: getPendingCashCloseMock,
 }))
 
 vi.mock('../lib/offline/db', () => ({
@@ -103,7 +111,12 @@ describe('CashRegister', () => {
     })
     confirmMock.mockReset().mockResolvedValue(true)
     toastMock.success.mockReset()
+    toastMock.info.mockReset()
     addPendingCashMovementMock.mockReset().mockResolvedValue(undefined)
+    setPendingCashOpenMock.mockReset().mockResolvedValue(undefined)
+    setPendingCashCloseMock.mockReset().mockResolvedValue(undefined)
+    getPendingCashOpenMock.mockReset().mockResolvedValue(null)
+    getPendingCashCloseMock.mockReset().mockResolvedValue(null)
   })
 
   it('mostra o formulário de abertura quando não há caixa aberto', async () => {
@@ -129,9 +142,38 @@ describe('CashRegister', () => {
     await user.click(screen.getByRole('button', { name: 'Abrir caixa' }))
 
     await waitFor(() => {
-      expect(cashOpenMock).toHaveBeenCalledWith(100)
+      expect(cashOpenMock).toHaveBeenCalledWith(100, expect.any(String))
     })
     expect(await screen.findByText('Caixa aberto')).toBeInTheDocument()
+  })
+
+  it('abre o caixa offline e enfileira para sincronizar depois quando não há rede', async () => {
+    const user = userEvent.setup()
+    cashCurrentMock.mockResolvedValue(null)
+    cashOpenMock.mockRejectedValue(new TypeError('Failed to fetch'))
+    getPendingCashOpenMock
+      .mockResolvedValueOnce(null)
+      .mockResolvedValue({
+        clientId: 'client-1',
+        tenantId: 'tenant-1',
+        openingAmount: 100,
+        createdAt: '2026-01-15T08:00:00Z',
+      })
+    render(<CashRegister />)
+    await screen.findByText('Caixa fechado')
+
+    await user.type(screen.getByPlaceholderText('Valor de abertura'), '100')
+    await user.click(screen.getByRole('button', { name: 'Abrir caixa' }))
+
+    await waitFor(() => {
+      expect(setPendingCashOpenMock).toHaveBeenCalledWith(
+        expect.objectContaining({ tenantId: 'tenant-1', openingAmount: 100 }),
+      )
+    })
+    expect(await screen.findByText('Caixa aberto')).toBeInTheDocument()
+    expect(
+      screen.getByText('Abertura pendente de sincronização'),
+    ).toBeInTheDocument()
   })
 
   it('exibe o resumo do caixa aberto', async () => {
@@ -237,12 +279,41 @@ describe('CashRegister', () => {
     await user.click(screen.getByRole('button', { name: 'Fechar caixa' }))
 
     await waitFor(() => {
-      expect(cashCloseMock).toHaveBeenCalledWith(250)
+      expect(cashCloseMock).toHaveBeenCalledWith(250, expect.any(String))
     })
     expect(
       await screen.findByRole('button', { name: 'Fechar aviso' }),
     ).toBeInTheDocument()
     expect(toastMock.success).toHaveBeenCalledWith('Caixa fechado.')
+  })
+
+  it('fecha o caixa offline e enfileira para sincronizar depois quando não há rede', async () => {
+    const user = userEvent.setup()
+    cashCurrentMock.mockResolvedValue(openRegister())
+    cashCloseMock.mockRejectedValue(new TypeError('Failed to fetch'))
+    getPendingCashCloseMock
+      .mockResolvedValueOnce(null)
+      .mockResolvedValue({
+        clientId: 'client-1',
+        tenantId: 'tenant-1',
+        closingAmount: 250,
+        createdAt: '2026-01-15T18:00:00Z',
+      })
+    render(<CashRegister />)
+    await screen.findByText('Caixa aberto')
+
+    await user.type(screen.getByPlaceholderText('Valor contado'), '250')
+    await user.click(screen.getByRole('button', { name: 'Fechar caixa' }))
+
+    await waitFor(() => {
+      expect(setPendingCashCloseMock).toHaveBeenCalledWith(
+        expect.objectContaining({ tenantId: 'tenant-1', closingAmount: 250 }),
+      )
+    })
+    expect(toastMock.info).toHaveBeenCalledWith(
+      'Caixa fechado offline. Será sincronizado quando a conexão voltar.',
+    )
+    expect(await screen.findByText('Caixa fechado')).toBeInTheDocument()
   })
 
   it('não fecha o caixa quando a confirmação é cancelada', async () => {

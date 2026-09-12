@@ -258,6 +258,8 @@ model CashRegister {
   id            String             @id @default(uuid())
   tenantId      String
   openedById    String
+  clientId      String?            @unique
+  closeClientId String?            @unique
   openingAmount Decimal            @db.Decimal(10, 2)
   closingAmount Decimal?           @db.Decimal(10, 2)
   status        CashRegisterStatus @default(OPEN)

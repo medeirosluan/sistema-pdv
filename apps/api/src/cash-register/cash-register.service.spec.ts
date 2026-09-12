@@ -73,6 +73,23 @@ describe('CashRegisterService', () => {
         expect.objectContaining({ action: 'cash.open' }),
       );
     });
+
+    it('retorna o caixa existente quando o clientId já foi processado (idempotência, ex.: sincronização offline)', async () => {
+      prisma.cashRegister.findFirst.mockResolvedValue({
+        id: 'reg-1',
+        clientId: 'client-abc',
+      });
+
+      const result = await service.open(
+        'tenant-1',
+        'user-1',
+        { clientId: 'client-abc', openingAmount: 100 } as never,
+        { email: 'demo@example.com' },
+      );
+
+      expect(result).toEqual({ id: 'reg-1', clientId: 'client-abc' });
+      expect(prisma.cashRegister.create).not.toHaveBeenCalled();
+    });
   });
 
   describe('close', () => {
@@ -129,6 +146,34 @@ describe('CashRegisterService', () => {
           }),
         }),
       );
+    });
+
+    it('retorna o resultado já calculado quando o clientId de fechamento já foi processado (idempotência)', async () => {
+      const openedAt = new Date('2026-01-01T08:00:00Z');
+      const closedAt = new Date('2026-01-01T18:00:00Z');
+      prisma.cashRegister.findFirst
+        .mockResolvedValueOnce(null) // não há caixa aberto (já foi fechado antes)
+        .mockResolvedValueOnce({
+          id: 'reg-1',
+          openedAt,
+          closedAt,
+          openingAmount: 100,
+          closingAmount: 170,
+          movements: [],
+        }); // encontrado pelo closeClientId
+
+      const result = await service.close(
+        'tenant-1',
+        { clientId: 'client-close-1', closingAmount: 170 } as never,
+        { userId: 'user-1', email: 'demo@example.com' },
+      );
+
+      expect(result.register).toEqual(
+        expect.objectContaining({ id: 'reg-1' }),
+      );
+      expect(result.summary.expectedCash).toBe(100);
+      expect(result.difference).toBe(70);
+      expect(prisma.cashRegister.update).not.toHaveBeenCalled();
     });
   });
 

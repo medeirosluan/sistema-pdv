@@ -26,7 +26,10 @@ import type { UserRole } from '../lib/api';
 import { refreshCatalog } from '../lib/offline/catalogCache';
 import {
   countPendingCashMovements,
+  countPendingCashSession,
+  syncPendingCashClose,
   syncPendingCashMovements,
+  syncPendingCashOpen,
 } from '../lib/offline/cashQueue';
 import {
   countPendingSales,
@@ -127,9 +130,10 @@ export function Layout() {
       Promise.all([
         countPendingSales(tenantId),
         countPendingCashMovements(tenantId),
-      ]).then(([sales, movements]) => {
+        countPendingCashSession(tenantId),
+      ]).then(([sales, movements, session]) => {
         if (active) {
-          setPendingCount(sales + movements);
+          setPendingCount(sales + movements + session);
         }
       });
     };
@@ -146,8 +150,17 @@ export function Layout() {
     try {
       await Promise.all([
         refreshCatalog(tenantId),
-        syncPendingSales(tenantId),
-        syncPendingCashMovements(tenantId),
+        (async () => {
+          // a abertura precisa sincronizar antes das vendas/movimentações e
+          // do fechamento, já que essas dependem de um caixa aberto no
+          // servidor; o fechamento só faz sentido depois delas.
+          await syncPendingCashOpen(tenantId);
+          await Promise.all([
+            syncPendingSales(tenantId),
+            syncPendingCashMovements(tenantId),
+          ]);
+          await syncPendingCashClose(tenantId);
+        })(),
       ]);
     } catch {
       // uma falha de rede aqui é esperada (ex.: sinal instável); a próxima

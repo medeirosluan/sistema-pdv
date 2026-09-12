@@ -44,6 +44,16 @@ export class CashRegisterService {
     dto: OpenCashRegisterDto,
     actor: { email: string },
   ) {
+    if (dto.clientId) {
+      const existingByClientId = await this.prisma.cashRegister.findFirst({
+        where: { tenantId, clientId: dto.clientId },
+        include: registerInclude,
+      });
+      if (existingByClientId) {
+        return existingByClientId;
+      }
+    }
+
     const existing = await this.findOpen(tenantId);
     if (existing) {
       throw new ConflictException('Já existe um caixa aberto');
@@ -52,6 +62,7 @@ export class CashRegisterService {
       data: {
         tenantId,
         openedById: userId,
+        clientId: dto.clientId ?? null,
         openingAmount: dto.openingAmount,
         status: CashRegisterStatus.OPEN,
       },
@@ -91,6 +102,28 @@ export class CashRegisterService {
   ) {
     const register = await this.findOpenDetailed(tenantId);
     if (!register) {
+      if (dto.clientId) {
+        const alreadyClosed = await this.prisma.cashRegister.findFirst({
+          where: { tenantId, closeClientId: dto.clientId },
+          include: registerInclude,
+        });
+        if (alreadyClosed) {
+          const closedSummary = await this.buildSummary(
+            tenantId,
+            alreadyClosed.openedAt,
+            alreadyClosed.closedAt,
+            alreadyClosed.movements,
+            Number(alreadyClosed.openingAmount),
+          );
+          return {
+            register: alreadyClosed,
+            summary: closedSummary,
+            difference: round2(
+              Number(alreadyClosed.closingAmount) - closedSummary.expectedCash,
+            ),
+          };
+        }
+      }
       throw new NotFoundException('Nenhum caixa aberto');
     }
 
@@ -109,6 +142,7 @@ export class CashRegisterService {
         status: CashRegisterStatus.CLOSED,
         closingAmount: dto.closingAmount,
         closedAt,
+        closeClientId: dto.clientId ?? null,
       },
       include: registerInclude,
     });

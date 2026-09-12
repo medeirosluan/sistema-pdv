@@ -18,7 +18,11 @@ import { useConfirm } from '../components/ui/useConfirm';
 import { useToast } from '../components/ui/useToast';
 import {
   addPendingCashMovement,
+  getPendingCashClose,
+  getPendingCashOpen,
   listPendingCashMovements,
+  setPendingCashClose,
+  setPendingCashOpen,
 } from '../lib/offline/cashQueue';
 import { getMeta, setMeta } from '../lib/offline/db';
 import { onPendingChanged } from '../lib/offline/salesQueue';
@@ -74,6 +78,52 @@ async function withPendingMovements(
   };
 }
 
+/**
+ * Sobrepõe abertura/fechamento de caixa feitos offline (ainda não
+ * sincronizados) ao último estado conhecido do servidor. Uma abertura
+ * pendente substitui o dado em cache (mesmo se o servidor disser que está
+ * fechado) porque, do ponto de vista do operador, o turno já começou; um
+ * fechamento pendente faz o caixa aparecer como fechado imediatamente,
+ * mesmo antes de a requisição real chegar ao servidor.
+ */
+async function withPendingCashSession(
+  tenantId: string,
+  data: CurrentCashRegister | null,
+  currentUser: { id: string; name: string } | null,
+): Promise<CurrentCashRegister | null> {
+  const pendingClose = await getPendingCashClose(tenantId);
+  if (pendingClose) {
+    return null;
+  }
+
+  let base = data;
+  const pendingOpen = await getPendingCashOpen(tenantId);
+  if (pendingOpen) {
+    base = {
+      register: {
+        id: `pending-open:${pendingOpen.clientId}`,
+        status: 'OPEN',
+        openingAmount: pendingOpen.openingAmount,
+        closingAmount: null,
+        openedAt: pendingOpen.createdAt,
+        closedAt: null,
+        openedBy: { id: currentUser?.id ?? '', name: currentUser?.name ?? '' },
+        movements: [],
+      },
+      summary: {
+        salesCount: 0,
+        salesTotal: 0,
+        byMethod: { CASH: 0, PIX: 0, CREDIT: 0, DEBIT: 0 },
+        deposits: 0,
+        withdrawals: 0,
+        expectedCash: pendingOpen.openingAmount,
+      },
+    };
+  }
+
+  return withPendingMovements(tenantId, base);
+}
+
 export function CashRegister() {
   const { user } = useAuth();
   const confirm = useConfirm();
@@ -94,24 +144,25 @@ export function CashRegister() {
 
   const loadCurrent = useCallback(async () => {
     const tenantId = user?.tenant.id ?? '';
+    const currentUser = user ? { id: user.id, name: user.name } : null;
     try {
       if (!navigator.onLine) {
         const cached = await getMeta(`cashCurrent:${tenantId}`);
         const data = cached
           ? (JSON.parse(cached) as CurrentCashRegister | null)
           : null;
-        setCurrent(await withPendingMovements(tenantId, data));
+        setCurrent(await withPendingCashSession(tenantId, data, currentUser));
         return;
       }
       const data = await cashApi.current();
       await setMeta(`cashCurrent:${tenantId}`, JSON.stringify(data));
-      setCurrent(await withPendingMovements(tenantId, data));
+      setCurrent(await withPendingCashSession(tenantId, data, currentUser));
     } catch (err) {
       setError(
         err instanceof ApiError ? err.message : 'Erro ao carregar o caixa',
       );
     }
-  }, [user?.tenant.id]);
+  }, [user]);
 
   const loadHistory = useCallback(async () => {
     try {
@@ -145,13 +196,33 @@ export function CashRegister() {
     event.preventDefault();
     setBusy(true);
     setError(null);
+    const tenantId = user?.tenant.id ?? '';
+    const amount = parseNumber(openingAmount);
+    const clientId = crypto.randomUUID();
     try {
-      await cashApi.open(parseNumber(openingAmount));
+      if (!navigator.onLine) {
+        throw new TypeError('offline');
+      }
+      await cashApi.open(amount, clientId);
       setOpeningAmount('');
       await loadCurrent();
       await loadHistory();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Erro ao abrir o caixa');
+      if (err instanceof ApiError) {
+        setError(err.message);
+      } else {
+        // sem rede: abre localmente e enfileira para sincronizar depois,
+        // igual ao fluxo de vendas e sangrias/suprimentos do PDV.
+        await setPendingCashOpen({
+          clientId,
+          tenantId,
+          openingAmount: amount,
+          createdAt: new Date().toISOString(),
+        });
+        setOpeningAmount('');
+        toast.info('Caixa aberto offline. Será sincronizado quando a conexão voltar.');
+        await loadCurrent();
+      }
     } finally {
       setBusy(false);
     }
@@ -209,15 +280,34 @@ export function CashRegister() {
     }
     setBusy(true);
     setError(null);
+    const tenantId = user?.tenant.id ?? '';
+    const amount = parseNumber(closingAmount);
+    const clientId = crypto.randomUUID();
     try {
-      const result = await cashApi.close(parseNumber(closingAmount));
+      if (!navigator.onLine) {
+        throw new TypeError('offline');
+      }
+      const result = await cashApi.close(amount, clientId);
       setCloseResult(result);
       setClosingAmount('');
       toast.success('Caixa fechado.');
       await loadCurrent();
       await loadHistory();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Erro ao fechar o caixa');
+      if (err instanceof ApiError) {
+        setError(err.message);
+      } else {
+        // sem rede: fecha localmente e enfileira para sincronizar depois.
+        await setPendingCashClose({
+          clientId,
+          tenantId,
+          closingAmount: amount,
+          createdAt: new Date().toISOString(),
+        });
+        setClosingAmount('');
+        toast.info('Caixa fechado offline. Será sincronizado quando a conexão voltar.');
+        await loadCurrent();
+      }
     } finally {
       setBusy(false);
     }
@@ -472,9 +562,16 @@ function CashOpenPanel({
               </p>
             </div>
           </div>
-          <span className="rounded-full bg-brand-100 px-3 py-1 text-xs font-medium text-brand-700">
-            Em andamento
-          </span>
+          <div className="flex items-center gap-2">
+            {register.id.startsWith('pending-open:') && (
+              <span className="rounded-full bg-sky-100 px-3 py-1 text-xs font-medium text-sky-700">
+                Abertura pendente de sincronização
+              </span>
+            )}
+            <span className="rounded-full bg-brand-100 px-3 py-1 text-xs font-medium text-brand-700">
+              Em andamento
+            </span>
+          </div>
         </div>
 
         <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

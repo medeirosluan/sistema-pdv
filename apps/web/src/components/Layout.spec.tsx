@@ -20,8 +20,11 @@ const onlineState = vi.hoisted(() => ({ value: true }))
 const refreshCatalogMock = vi.hoisted(() => vi.fn(async () => ({ products: 0, customers: 0 })))
 const syncPendingSalesMock = vi.hoisted(() => vi.fn(async () => ({ synced: 0, failed: 0 })))
 const syncPendingCashMovementsMock = vi.hoisted(() => vi.fn(async () => ({ synced: 0, failed: 0 })))
+const syncPendingCashOpenMock = vi.hoisted(() => vi.fn(async () => undefined))
+const syncPendingCashCloseMock = vi.hoisted(() => vi.fn(async () => undefined))
 const countPendingSalesMock = vi.hoisted(() => vi.fn(async () => 0))
 const countPendingCashMovementsMock = vi.hoisted(() => vi.fn(async () => 0))
+const countPendingCashSessionMock = vi.hoisted(() => vi.fn(async () => 0))
 
 vi.mock('../lib/useAuth', () => ({
   useAuth: () => ({
@@ -54,6 +57,9 @@ vi.mock('../lib/offline/salesQueue', () => ({
 vi.mock('../lib/offline/cashQueue', () => ({
   countPendingCashMovements: countPendingCashMovementsMock,
   syncPendingCashMovements: syncPendingCashMovementsMock,
+  countPendingCashSession: countPendingCashSessionMock,
+  syncPendingCashOpen: syncPendingCashOpenMock,
+  syncPendingCashClose: syncPendingCashCloseMock,
 }))
 
 function renderLayout() {
@@ -74,8 +80,11 @@ describe('Layout — fluxo offline', () => {
     refreshCatalogMock.mockClear()
     syncPendingSalesMock.mockClear()
     syncPendingCashMovementsMock.mockClear()
+    syncPendingCashOpenMock.mockClear().mockResolvedValue(undefined)
+    syncPendingCashCloseMock.mockClear().mockResolvedValue(undefined)
     countPendingSalesMock.mockReset().mockResolvedValue(0)
     countPendingCashMovementsMock.mockReset().mockResolvedValue(0)
+    countPendingCashSessionMock.mockReset().mockResolvedValue(0)
   })
 
   it('não mostra o indicador de offline quando está online', async () => {
@@ -99,7 +108,33 @@ describe('Layout — fluxo offline', () => {
       expect(refreshCatalogMock).toHaveBeenCalledWith('tenant-1')
       expect(syncPendingSalesMock).toHaveBeenCalledWith('tenant-1')
       expect(syncPendingCashMovementsMock).toHaveBeenCalledWith('tenant-1')
+      expect(syncPendingCashOpenMock).toHaveBeenCalledWith('tenant-1')
+      expect(syncPendingCashCloseMock).toHaveBeenCalledWith('tenant-1')
     })
+  })
+
+  it('sincroniza a abertura do caixa antes das vendas/movimentos e o fechamento por último', async () => {
+    const order: string[] = []
+    syncPendingCashOpenMock.mockImplementation(async () => {
+      order.push('open')
+    })
+    syncPendingSalesMock.mockImplementation(async () => {
+      order.push('sales')
+      return { synced: 0, failed: 0 }
+    })
+    syncPendingCashMovementsMock.mockImplementation(async () => {
+      order.push('movements')
+      return { synced: 0, failed: 0 }
+    })
+    syncPendingCashCloseMock.mockImplementation(async () => {
+      order.push('close')
+    })
+    renderLayout()
+
+    await waitFor(() => expect(syncPendingCashCloseMock).toHaveBeenCalled())
+
+    expect(order[0]).toBe('open')
+    expect(order[order.length - 1]).toBe('close')
   })
 
   it('não sincroniza quando está offline', async () => {

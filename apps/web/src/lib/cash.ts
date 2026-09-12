@@ -61,10 +61,10 @@ export const cashMovementLabels: Record<CashMovementType, string> = {
 export const cashApi = {
   current: () =>
     http.get<CurrentCashRegister | null>('/cash-register/current'),
-  open: (openingAmount: number) =>
-    http.post<CashRegister>('/cash-register/open', { openingAmount }),
-  close: (closingAmount: number) =>
-    http.post<CloseResult>('/cash-register/close', { closingAmount }),
+  open: (openingAmount: number, clientId?: string) =>
+    http.post<CashRegister>('/cash-register/open', { openingAmount, clientId }),
+  close: (closingAmount: number, clientId?: string) =>
+    http.post<CloseResult>('/cash-register/close', { closingAmount, clientId }),
   addMovement: (input: CreateMovementInput) =>
     http.post<CashMovement>('/cash-register/movements', input),
   history: (page = 1, pageSize = 10) => {
