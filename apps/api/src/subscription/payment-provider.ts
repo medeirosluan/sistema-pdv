@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadGatewayException, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { TenantPlan } from '../generated/prisma/enums.js';
 
@@ -104,7 +104,10 @@ export class AsaasPaymentProvider implements PaymentProvider {
 
     if (!response.ok) {
       const text = await response.text();
-      throw new Error(`Asaas ${response.status}: ${text}`);
+      console.error(`Asaas ${response.status} em ${path}: ${text}`);
+      throw new BadGatewayException(
+        'Não foi possível processar o pagamento no momento. Tente novamente em instantes.',
+      );
     }
     return (await response.json()) as T;
   }

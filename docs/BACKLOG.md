@@ -129,6 +129,6 @@ Legenda: `[ ]` pendente · `[~]` em andamento · `[x]` concluído
 
 ## Débitos técnicos / ideias
 
-- [ ] Padronizar mensagens de erro da API
-- [ ] Paginação e ordenação padronizadas nas listagens
+- [ ] Padronizar mensagens de erro da API (parcial: corrigidos 2 pontos que vazavam `throw new Error` cru como 500 genérico — ver `common/date-range.ts` e `subscription/payment-provider.ts`; a inconsistência `message: string` vs `string[]` do Nest/class-validator ficou como está, pois o frontend já trata ambos os formatos)
+- [x] Paginação e ordenação padronizadas nas listagens
 - [x] Seed de dados de demonstração

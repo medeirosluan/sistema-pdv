@@ -1,6 +1,7 @@
 import { Transform, Type } from 'class-transformer';
 import {
   IsBoolean,
+  IsIn,
   IsInt,
   IsOptional,
   IsString,
@@ -8,6 +9,8 @@ import {
   Max,
   Min,
 } from 'class-validator';
+
+const SORTABLE_FIELDS = ['name', 'price', 'stock', 'createdAt'] as const;
 
 export class QueryProductsDto {
   @IsOptional()
@@ -37,4 +40,12 @@ export class QueryProductsDto {
   )
   @IsBoolean()
   active?: boolean;
+
+  @IsOptional()
+  @IsIn(SORTABLE_FIELDS)
+  sortBy?: (typeof SORTABLE_FIELDS)[number];
+
+  @IsOptional()
+  @IsIn(['asc', 'desc'])
+  sortOrder?: 'asc' | 'desc';
 }

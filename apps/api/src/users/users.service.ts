@@ -72,7 +72,7 @@ export class UsersService {
       this.prisma.user.findMany({
         where,
         select: userSelect,
-        orderBy: { createdAt: 'asc' },
+        orderBy: { [query.sortBy ?? 'createdAt']: query.sortOrder ?? 'asc' },
         skip: (page - 1) * pageSize,
         take: pageSize,
       }),

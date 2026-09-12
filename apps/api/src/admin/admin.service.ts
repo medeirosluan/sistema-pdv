@@ -45,7 +45,7 @@ export class AdminService {
         include: {
           _count: { select: { users: true, products: true, sales: true } },
         },
-        orderBy: { createdAt: 'desc' },
+        orderBy: { [query.sortBy ?? 'createdAt']: query.sortOrder ?? 'desc' },
         skip: (page - 1) * pageSize,
         take: pageSize,
       }),

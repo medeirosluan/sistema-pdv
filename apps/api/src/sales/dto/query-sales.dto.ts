@@ -2,12 +2,15 @@ import { Type } from 'class-transformer';
 import {
   IsDateString,
   IsEnum,
+  IsIn,
   IsInt,
   IsOptional,
   Max,
   Min,
 } from 'class-validator';
 import { SaleStatus } from '../../generated/prisma/enums.js';
+
+const SORTABLE_FIELDS = ['number', 'total', 'createdAt'] as const;
 
 export class QuerySalesDto {
   @IsOptional()
@@ -34,4 +37,12 @@ export class QuerySalesDto {
   @IsOptional()
   @IsDateString()
   to?: string;
+
+  @IsOptional()
+  @IsIn(SORTABLE_FIELDS)
+  sortBy?: (typeof SORTABLE_FIELDS)[number];
+
+  @IsOptional()
+  @IsIn(['asc', 'desc'])
+  sortOrder?: 'asc' | 'desc';
 }

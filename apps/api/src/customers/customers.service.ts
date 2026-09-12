@@ -27,7 +27,7 @@ export class CustomersService {
     const [items, total] = await Promise.all([
       this.prisma.customer.findMany({
         where,
-        orderBy: { name: 'asc' },
+        orderBy: { [query.sortBy ?? 'name']: query.sortOrder ?? 'asc' },
         skip: (page - 1) * pageSize,
         take: pageSize,
       }),

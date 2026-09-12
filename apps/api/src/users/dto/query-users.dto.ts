@@ -1,5 +1,7 @@
 import { Type } from 'class-transformer';
-import { IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+
+const SORTABLE_FIELDS = ['name', 'email', 'createdAt'] as const;
 
 export class QueryUsersDto {
   @IsOptional()
@@ -18,4 +20,12 @@ export class QueryUsersDto {
   @IsOptional()
   @IsString()
   search?: string;
+
+  @IsOptional()
+  @IsIn(SORTABLE_FIELDS)
+  sortBy?: (typeof SORTABLE_FIELDS)[number];
+
+  @IsOptional()
+  @IsIn(['asc', 'desc'])
+  sortOrder?: 'asc' | 'desc';
 }

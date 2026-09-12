@@ -1,9 +1,11 @@
+import { BadRequestException } from '@nestjs/common';
+
 const DATE_ONLY_PATTERN = /^(\d{4})-(\d{2})-(\d{2})/;
 
 function dateParts(value: string): [number, number, number] {
   const match = DATE_ONLY_PATTERN.exec(value);
   if (!match) {
-    throw new Error(`Data inválida: ${value}`);
+    throw new BadRequestException(`Data inválida: ${value}`);
   }
   return [Number(match[1]), Number(match[2]), Number(match[3])];
 }

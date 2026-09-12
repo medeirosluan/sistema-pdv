@@ -44,7 +44,7 @@ export class ProductsService {
       this.prisma.product.findMany({
         where,
         include: { category: true },
-        orderBy: { name: 'asc' },
+        orderBy: { [query.sortBy ?? 'name']: query.sortOrder ?? 'asc' },
         skip: (page - 1) * pageSize,
         take: pageSize,
       }),

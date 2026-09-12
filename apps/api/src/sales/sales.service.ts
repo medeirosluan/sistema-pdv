@@ -45,7 +45,7 @@ export class SalesService {
       this.prisma.sale.findMany({
         where,
         include: saleInclude,
-        orderBy: { createdAt: 'desc' },
+        orderBy: { [query.sortBy ?? 'createdAt']: query.sortOrder ?? 'desc' },
         skip: (page - 1) * pageSize,
         take: pageSize,
       }),
