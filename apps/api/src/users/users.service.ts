@@ -253,13 +253,11 @@ export class UsersService {
       await this.ensureNotLastOwner(tenantId, user.id);
     }
 
-    const [sales, cashRegisters, stockMovements] = await this.prisma.$transaction(
-      [
-        this.prisma.sale.count({ where: { createdById: user.id } }),
-        this.prisma.cashRegister.count({ where: { openedById: user.id } }),
-        this.prisma.stockMovement.count({ where: { createdById: user.id } }),
-      ],
-    );
+    const [sales, cashRegisters, stockMovements] = await Promise.all([
+      this.prisma.sale.count({ where: { createdById: user.id } }),
+      this.prisma.cashRegister.count({ where: { openedById: user.id } }),
+      this.prisma.stockMovement.count({ where: { createdById: user.id } }),
+    ]);
     if (sales + cashRegisters + stockMovements > 0) {
       throw new ConflictException(
         'Este usuário possui histórico (vendas, caixa ou estoque). Inative-o em vez de excluir.',
