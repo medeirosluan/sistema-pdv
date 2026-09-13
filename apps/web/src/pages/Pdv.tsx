@@ -753,10 +753,10 @@ export function Pdv() {
       </div>
 
       <div className="lg:sticky lg:top-0 lg:h-fit">
-        <div className="flex flex-col rounded-2xl border border-slate-200 bg-white">
-          <div className="flex items-center gap-2 border-b border-slate-200 px-5 py-4">
-            <ShoppingCart className="h-4 w-4 text-slate-500" />
-            <h2 className="text-sm font-semibold text-slate-900">Carrinho</h2>
+        <div className="flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg shadow-slate-900/5">
+          <div className="flex items-center gap-2 border-b border-slate-100 px-5 py-4">
+            <ShoppingCart className="h-5 w-5 text-brand-600" />
+            <h2 className="text-base font-semibold text-slate-900">Carrinho</h2>
             {heldSales.length > 0 && (
               <button
                 type="button"
@@ -766,8 +766,8 @@ export function Pdv() {
                 {heldSales.length} em espera
               </button>
             )}
-            <span className="ml-auto text-xs text-slate-400">
-              {cart.length} item(ns)
+            <span className="ml-auto text-xs font-medium text-slate-500">
+              {cart.length} {cart.length === 1 ? 'item' : 'itens'} · {cart.reduce((sum, line) => sum + line.quantity, 0)} un.
             </span>
           </div>
 
@@ -805,57 +805,62 @@ export function Pdv() {
             </div>
           )}
 
-          <div className="max-h-64 flex-1 overflow-y-auto px-5 py-3">
+          <div className="max-h-80 flex-1 overflow-y-auto">
             {cart.length === 0 ? (
-              <p className="py-8 text-center text-sm text-slate-400">
-                Adicione produtos ao carrinho.
-              </p>
+              <div className="px-5 py-12 text-center">
+                <ShoppingCart className="mx-auto h-8 w-8 text-brand-200" />
+                <p className="mt-3 text-sm font-medium text-slate-600">Seu carrinho está vazio</p>
+                <p className="mt-1 text-xs text-slate-400">Busque um produto, use F2 ou bipar o código de barras.</p>
+              </div>
             ) : (
-              <ul className="divide-y divide-slate-100">
+              <ul className="divide-y divide-slate-100 px-5">
                 {cart.map((line) => {
                   const selected = line.product.id === selectedLineId;
                   return (
                     <li
                       key={line.product.id}
                       onClick={() => setSelectedLineId(line.product.id)}
-                      className={`flex cursor-pointer items-center gap-2 rounded-lg px-2 py-3 ${
+                      className={`flex cursor-pointer items-start gap-3 px-0 py-4 ${
                         selected ? 'bg-brand-50 ring-1 ring-brand-300' : ''
                       } ${lastAddedId === line.product.id ? 'animate-flash' : ''}`}
                     >
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-sm font-bold text-brand-700">
+                      {productDisplayName(line.product).slice(0, 1).toUpperCase()}
+                    </div>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium text-slate-900">
                         {productDisplayName(line.product)}
                       </p>
                       <p className="text-xs text-slate-400">
-                        {formatBRL(line.product.price)} × {line.quantity}
+                        {line.product.unit} · {formatBRL(line.product.price)} cada
                       </p>
                     </div>
                     <div className="flex items-center gap-1">
                       <button
                         type="button"
                         onClick={() => changeQuantity(line.product.id, -1)}
-                        className="rounded-md border border-slate-200 p-1 text-slate-500 transition hover:bg-slate-50"
+                        className="rounded-l-lg border border-slate-200 p-1.5 text-slate-500 transition hover:bg-slate-50"
                       >
                         <Minus className="h-3.5 w-3.5" />
                       </button>
-                      <span className="w-6 text-center text-sm font-medium text-slate-700">
+                      <span className="w-8 border-y border-slate-200 py-1.5 text-center text-sm font-semibold text-slate-700">
                         {line.quantity}
                       </span>
                       <button
                         type="button"
                         onClick={() => changeQuantity(line.product.id, 1)}
-                        className="rounded-md border border-slate-200 p-1 text-slate-500 transition hover:bg-slate-50"
+                        className="rounded-r-lg border border-slate-200 p-1.5 text-brand-600 transition hover:bg-brand-50"
                       >
                         <Plus className="h-3.5 w-3.5" />
                       </button>
                     </div>
-                    <span className="w-16 text-right text-sm font-semibold text-slate-900">
+                    <span className="w-16 pt-1 text-right text-sm font-semibold text-slate-900">
                       {formatBRL(Number(line.product.price) * line.quantity)}
                     </span>
                     <button
                       type="button"
                       onClick={() => removeLine(line.product.id)}
-                      className="rounded-md p-1 text-slate-400 transition hover:bg-red-50 hover:text-red-600"
+                      className="mt-0.5 rounded-md p-1.5 text-slate-400 transition hover:bg-red-50 hover:text-red-600"
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
@@ -882,12 +887,12 @@ export function Pdv() {
                 onChange={(e) => setDiscountInput(e.target.value)}
                 placeholder="0,00"
                 inputMode="decimal"
-                className="w-24 rounded-lg border border-slate-300 px-2 py-1 text-right text-sm outline-none focus:border-brand-500"
+                className="w-24 rounded-lg border border-slate-300 px-2 py-1.5 text-right text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/15"
               />
             </div>
-            <div className="flex items-center justify-between border-t border-slate-100 pt-3">
-              <span className="text-sm font-medium text-slate-700">Total</span>
-              <span className="text-2xl font-bold text-slate-900">
+            <div className="flex items-end justify-between border-t border-slate-100 pt-4">
+              <span className="text-base font-semibold text-slate-800">Total</span>
+              <span className="text-3xl font-bold tracking-tight text-slate-900">
                 {formatBRL(total)}
               </span>
             </div>
@@ -895,12 +900,12 @@ export function Pdv() {
             <button
               type="button"
               onClick={() => setPaymentOpen(true)}
-              className="w-full rounded-lg border border-slate-300 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+              className="w-full rounded-xl border border-slate-300 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
             >
               Pagamento (F8)
             </button>
 
-            <div className="space-y-1 rounded-lg bg-slate-50 px-3 py-2 text-sm">
+            <div className="space-y-1 rounded-xl bg-slate-50 px-3 py-2 text-sm">
               <div className="flex justify-between">
                 <span className="text-slate-500">Pago</span>
                 <span className="font-medium text-slate-700">
@@ -917,8 +922,8 @@ export function Pdv() {
               )}
               {change > 0 && (
                 <div className="flex justify-between">
-                  <span className="text-slate-500">Troco</span>
-                  <span className="font-semibold text-slate-900">
+                  <span className="text-brand-800">Troco</span>
+                  <span className="font-semibold text-brand-800">
                     {formatBRL(change)}
                   </span>
                 </div>
@@ -950,10 +955,19 @@ export function Pdv() {
                 cashOpen === false ||
                 (total > 0 && remaining > 0)
               }
-              className="w-full rounded-lg bg-brand-600 py-3 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+              className="w-full rounded-xl bg-brand-600 py-3.5 text-sm font-semibold text-white shadow-lg shadow-brand-600/20 transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {submitting ? 'Finalizando...' : 'Finalizar venda (F9)'}
+              {submitting ? 'Finalizando...' : `Finalizar venda · ${formatBRL(total)} (F9)`}
             </button>
+            {cart.length > 0 && (
+              <button
+                type="button"
+                onClick={cancelSale}
+                className="w-full py-1 text-xs font-medium text-slate-500 transition hover:text-red-600"
+              >
+                Limpar carrinho
+              </button>
+            )}
           </div>
         </div>
       </div>

@@ -183,7 +183,7 @@ describe('Pdv', () => {
     expect(
       screen.getByText('Digite o nome ou o código para buscar produtos.'),
     ).toBeInTheDocument()
-    expect(screen.getByText('Adicione produtos ao carrinho.')).toBeInTheDocument()
+    expect(screen.getByText('Seu carrinho está vazio')).toBeInTheDocument()
   })
 
   it('busca produtos após digitar e permite adicionar ao carrinho', async () => {
@@ -195,8 +195,9 @@ describe('Pdv', () => {
     expect(productsListMock).toHaveBeenCalledWith(
       expect.objectContaining({ search: 'Água' }),
     )
-    expect(screen.getByText('1 item(ns)')).toBeInTheDocument()
-    expect(screen.getByText('R$ 3,00 × 1')).toBeInTheDocument()
+    expect(screen.getByText('1 item · 1 un.')).toBeInTheDocument()
+    const cartItem = screen.getAllByText('Água Mineral 500ml')[1].closest('li')
+    expect(within(cartItem as HTMLElement).getByText('R$ 3,00')).toBeInTheDocument()
   })
 
   it('prioriza um código de barras exato sobre um item apenas destacado por navegação (leitor de código de barras)', async () => {
@@ -227,7 +228,7 @@ describe('Pdv', () => {
     await user.keyboard('{ArrowDown}')
     await user.keyboard('{Enter}')
 
-    expect(screen.getByText('1 item(ns)')).toBeInTheDocument()
+    expect(screen.getByText('1 item · 1 un.')).toBeInTheDocument()
     expect(screen.getByText('Refrigerante Cola')).toBeInTheDocument()
     expect(screen.queryByText('Água Mineral 500ml')).not.toBeInTheDocument()
   })
@@ -242,7 +243,7 @@ describe('Pdv', () => {
     const plusButton = within(cartItem as HTMLElement).getAllByRole('button')[1]
     await user.click(plusButton)
 
-    expect(screen.getByText('R$ 3,00 × 2')).toBeInTheDocument()
+    expect(within(cartItem as HTMLElement).getByText('R$ 6,00')).toBeInTheDocument()
   })
 
   it('remove o produto do carrinho pelo botão de lixeira', async () => {
@@ -254,7 +255,7 @@ describe('Pdv', () => {
     const buttons = within(cartItem as HTMLElement).getAllByRole('button')
     await user.click(buttons[buttons.length - 1])
 
-    expect(screen.getByText('Adicione produtos ao carrinho.')).toBeInTheDocument()
+    expect(screen.getByText('Seu carrinho está vazio')).toBeInTheDocument()
   })
 
   it('desabilita finalizar quando o carrinho está vazio', () => {
@@ -282,7 +283,7 @@ describe('Pdv', () => {
     expect(
       await screen.findByText('Venda #1 finalizada — R$ 3,00'),
     ).toBeInTheDocument()
-    expect(screen.getByText('Adicione produtos ao carrinho.')).toBeInTheDocument()
+    expect(screen.getByText('Seu carrinho está vazio')).toBeInTheDocument()
   })
 
   it('bloqueia a venda e avisa quando o caixa está fechado', async () => {
@@ -330,7 +331,7 @@ describe('Pdv', () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText('Adicione produtos ao carrinho.'),
+        screen.getByText('Seu carrinho está vazio'),
       ).toBeInTheDocument()
     })
   })
