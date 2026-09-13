@@ -134,11 +134,11 @@ export function Pdv() {
     }
   }, []);
 
-  const heldSalesKey = user?.tenant.id
-    ? `pdv.heldSales.${user.tenant.id}`
+  const heldSalesKey = user?.tenant.id && user.id
+    ? `pdv.heldSales.${user.tenant.id}.${user.id}`
     : null;
-  const saleDraftKey = user?.tenant.id
-    ? `pdv.saleDraft.${user.tenant.id}`
+  const saleDraftKey = user?.tenant.id && user.id
+    ? `pdv.saleDraft.${user.tenant.id}.${user.id}`
     : null;
 
   useEffect(() => {
@@ -584,7 +584,7 @@ export function Pdv() {
   }
 
   async function finalize() {
-    if (cart.length === 0) {
+    if (cart.length === 0 || submitting) {
       return;
     }
     if (cashOpen === false) {
@@ -703,7 +703,7 @@ export function Pdv() {
   }
 
   function handleFinalizeAction() {
-    if (cart.length === 0 || cashOpen === false) {
+    if (cart.length === 0 || cashOpen === false || submitting) {
       return;
     }
     if (remaining > 0) {

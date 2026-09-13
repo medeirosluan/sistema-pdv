@@ -62,7 +62,7 @@ export default function App() {
           <Route
             path="vendas"
             element={
-              <PermissionRoute permission="reports.view">
+              <PermissionRoute permission="sales.view">
                 <Sales />
               </PermissionRoute>
             }

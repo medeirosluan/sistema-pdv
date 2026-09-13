@@ -4,6 +4,7 @@ import { useAuth } from './useAuth';
 export type Permission =
   | 'sales.create'
   | 'sales.cancel'
+  | 'sales.view'
   | 'reports.view'
   | 'products.view'
   | 'products.manage'
@@ -37,6 +38,12 @@ export const PERMISSIONS: PermissionDef[] = [
     label: 'Cancelar venda',
     group: 'Vendas',
     roles: ['OWNER', 'MANAGER'],
+  },
+  {
+    key: 'sales.view',
+    label: 'Ver histórico de vendas',
+    group: 'Vendas',
+    roles: ['OWNER', 'MANAGER', 'CASHIER'],
   },
   {
     key: 'reports.view',

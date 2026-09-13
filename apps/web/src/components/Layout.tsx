@@ -62,7 +62,7 @@ const navItems: NavItem[] = [
     permission: 'reports.view',
   },
   { to: '/pdv', label: 'PDV', icon: ShoppingCart, permission: 'sales.create' },
-  { to: '/vendas', label: 'Vendas', icon: Receipt, permission: 'reports.view' },
+  { to: '/vendas', label: 'Vendas', icon: Receipt, permission: 'sales.view' },
   { to: '/produtos', label: 'Produtos', icon: Package, permission: 'products.view' },
   { to: '/clientes', label: 'Clientes', icon: Users, permission: 'customers.view' },
   { to: '/caixa', label: 'Caixa', icon: Wallet, permission: 'cash.operate' },

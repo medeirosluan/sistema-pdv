@@ -23,6 +23,7 @@ describe('rolePermissions', () => {
   it('retorna todas as permissões cujo papel está incluído', () => {
     const cashierPermissions = rolePermissions('CASHIER')
     expect(cashierPermissions).toContain('sales.create')
+    expect(cashierPermissions).toContain('sales.view')
     expect(cashierPermissions).toContain('cash.operate')
     expect(cashierPermissions).not.toContain('cash.history')
     expect(cashierPermissions).not.toContain('reports.view')

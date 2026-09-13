@@ -15,6 +15,7 @@ describe('permissions', () => {
   it('CASHIER tem o conjunto padrão', () => {
     const permissions = effectivePermissions('CASHIER', null);
     expect(permissions).toContain('sales.create');
+    expect(permissions).toContain('sales.view');
     expect(permissions).toContain('cash.operate');
     expect(permissions).not.toContain('cash.history');
     expect(permissions).not.toContain('reports.view');

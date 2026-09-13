@@ -17,13 +17,13 @@ import { SalesService } from './sales.service.js';
 export class SalesController {
   constructor(private readonly salesService: SalesService) {}
 
-  @RequirePermission('reports.view')
+  @RequirePermission('sales.view')
   @Get()
   list(@CurrentUser() user: AuthUser, @Query() query: QuerySalesDto) {
     return this.salesService.list(user.storeId, query);
   }
 
-  @RequirePermission('reports.view')
+  @RequirePermission('sales.view')
   @Get(':id')
   findOne(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.salesService.findOne(user.storeId, id);

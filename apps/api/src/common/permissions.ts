@@ -3,6 +3,7 @@ import { UserRole } from '../generated/prisma/enums.js';
 export const PERMISSIONS = [
   'sales.create',
   'sales.cancel',
+  'sales.view',
   'reports.view',
   'products.view',
   'products.manage',
@@ -25,6 +26,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   MANAGER: [
     'sales.create',
     'sales.cancel',
+    'sales.view',
     'reports.view',
     'products.view',
     'products.manage',
@@ -39,6 +41,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   ],
   CASHIER: [
     'sales.create',
+    'sales.view',
     'products.view',
     'customers.view',
     'cash.operate',
