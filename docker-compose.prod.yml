@@ -30,6 +30,8 @@ services:
       NODE_ENV: production
       PORT: 3000
       DATABASE_URL: postgresql://${POSTGRES_USER:-pdv}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-pdv}?schema=public
+      APP_DB_USER: ${APP_DB_USER:-pdv_app}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?defina APP_DB_PASSWORD no .env.prod}
       APP_DATABASE_URL: postgresql://${APP_DB_USER:-pdv_app}:${APP_DB_PASSWORD}@db:5432/${POSTGRES_DB:-pdv}?schema=public
       JWT_SECRET: ${JWT_SECRET:?defina JWT_SECRET no .env.prod}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?defina JWT_REFRESH_SECRET no .env.prod}
