@@ -11,7 +11,9 @@ function createTxMock() {
       create: vi.fn(),
       update: vi.fn(),
     },
-    product: {
+    productStock: {
+      findUnique: vi.fn(),
+      create: vi.fn(),
       update: vi.fn(),
     },
     stockMovement: {
@@ -67,9 +69,10 @@ describe('SalesService', () => {
         items: [],
         payments: [],
       });
-      tx.product.update.mockResolvedValue({ stock: 4 });
+      tx.productStock.findUnique.mockResolvedValue({ id: 'ps-1', stock: 6, minStock: 0 });
+      tx.productStock.update.mockResolvedValue({ id: 'ps-1', stock: 4 });
 
-      await service.create('tenant-1', 'user-1', {
+      await service.create('tenant-1', 'store-1', 'user-1', {
         items: [{ productId: 'prod-1', quantity: 2 }],
         payments: [{ method: PaymentMethod.CASH, amount: 20 }],
       } as never);
@@ -78,6 +81,7 @@ describe('SalesService', () => {
         expect.objectContaining({
           data: expect.objectContaining({
             tenantId: 'tenant-1',
+            storeId: 'store-1',
             productId: 'prod-1',
             type: StockMovementType.OUT,
             quantity: 2,
@@ -98,20 +102,20 @@ describe('SalesService', () => {
         payments: [],
       });
 
-      await service.create('tenant-1', 'user-1', {
+      await service.create('tenant-1', 'store-1', 'user-1', {
         items: [{ description: 'Item avulso', quantity: 1, unitPrice: 15 }],
         payments: [{ method: PaymentMethod.CASH, amount: 15 }],
       } as never);
 
       expect(tx.stockMovement.create).not.toHaveBeenCalled();
-      expect(tx.product.update).not.toHaveBeenCalled();
+      expect(tx.productStock.update).not.toHaveBeenCalled();
     });
 
     it('recusa a venda quando não há caixa aberto', async () => {
       prisma.cashRegister.findFirst.mockResolvedValue(null);
 
       await expect(
-        service.create('tenant-1', 'user-1', {
+        service.create('tenant-1', 'store-1', 'user-1', {
           items: [{ description: 'Item avulso', quantity: 1, unitPrice: 15 }],
           payments: [{ method: PaymentMethod.CASH, amount: 15 }],
         } as never),
@@ -125,14 +129,16 @@ describe('SalesService', () => {
     it('gera um StockMovement IN para cada item da venda cancelada', async () => {
       prisma.sale.findFirst.mockResolvedValue({
         id: 'sale-1',
+        tenantId: 'tenant-1',
         number: 7,
         status: SaleStatus.FINISHED,
         items: [{ productId: 'prod-1', quantity: 3 }],
       });
       tx.sale.update.mockResolvedValue({ id: 'sale-1' });
-      tx.product.update.mockResolvedValue({ stock: 13 });
+      tx.productStock.findUnique.mockResolvedValue({ id: 'ps-1', stock: 10, minStock: 0 });
+      tx.productStock.update.mockResolvedValue({ id: 'ps-1', stock: 13 });
 
-      await service.cancel('tenant-1', 'sale-1', {
+      await service.cancel('store-1', 'sale-1', {
         userId: 'user-1',
         email: 'user@example.com',
       });

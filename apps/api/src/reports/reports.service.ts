@@ -45,7 +45,7 @@ export interface SalesReport {
 export class ReportsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async summary(tenantId: string): Promise<DashboardSummary> {
+  async summary(tenantId: string, storeId: string): Promise<DashboardSummary> {
     const now = new Date();
     const startOfDay = new Date(
       now.getFullYear(),
@@ -66,7 +66,7 @@ export class ReportsService {
     ] = await Promise.all([
       this.prisma.sale.aggregate({
         where: {
-          tenantId,
+          storeId,
           status: SaleStatus.FINISHED,
           createdAt: { gte: startOfDay },
         },
@@ -75,7 +75,7 @@ export class ReportsService {
       }),
       this.prisma.sale.aggregate({
         where: {
-          tenantId,
+          storeId,
           status: SaleStatus.FINISHED,
           createdAt: { gte: startOfMonth },
         },
@@ -84,13 +84,13 @@ export class ReportsService {
       }),
       this.prisma.product.count({ where: { tenantId } }),
       this.prisma.product.count({ where: { tenantId, active: true } }),
-      this.prisma.product.findMany({
-        where: { tenantId, active: true },
+      this.prisma.productStock.findMany({
+        where: { storeId, product: { active: true } },
         select: { stock: true, minStock: true },
       }),
-      this.prisma.customer.count({ where: { tenantId } }),
+      this.prisma.customer.count({ where: { storeId } }),
       this.prisma.sale.findMany({
-        where: { tenantId, status: SaleStatus.FINISHED },
+        where: { storeId, status: SaleStatus.FINISHED },
         orderBy: { createdAt: 'desc' },
         take: 5,
         select: {
@@ -103,7 +103,7 @@ export class ReportsService {
       }),
       this.prisma.sale.findMany({
         where: {
-          tenantId,
+          storeId,
           status: SaleStatus.FINISHED,
           createdAt: { gte: addDays(startOfDay, -(CHART_DAYS - 1)) },
         },
@@ -115,7 +115,7 @@ export class ReportsService {
     const monthTotal = Number(monthAgg._sum.total ?? 0);
     const monthCount = monthAgg._count;
     const productLowStock = lowStockProducts.filter(
-      (product) => Number(product.stock) <= Number(product.minStock),
+      (item) => Number(item.stock) <= Number(item.minStock),
     ).length;
 
     const days = new Map<string, { total: number; count: number }>();
@@ -156,7 +156,7 @@ export class ReportsService {
   }
 
   async salesReport(
-    tenantId: string,
+    storeId: string,
     dto: QuerySalesReportDto,
   ): Promise<SalesReport> {
     const to = dto.to ? endOfDayLocal(dto.to) : new Date();
@@ -166,7 +166,7 @@ export class ReportsService {
 
     const sales = await this.prisma.sale.findMany({
       where: {
-        tenantId,
+        storeId,
         status: SaleStatus.FINISHED,
         createdAt: { gte: from, lte: to },
       },

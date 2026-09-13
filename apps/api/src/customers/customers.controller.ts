@@ -22,18 +22,18 @@ export class CustomersController {
 
   @Get()
   list(@CurrentUser() user: AuthUser, @Query() query: QueryCustomersDto) {
-    return this.customersService.list(user.tenantId, query);
+    return this.customersService.list(user.storeId, query);
   }
 
   @Get(':id')
   findOne(@CurrentUser() user: AuthUser, @Param('id') id: string) {
-    return this.customersService.findOne(user.tenantId, id);
+    return this.customersService.findOne(user.storeId, id);
   }
 
   @RequirePermission('customers.manage')
   @Post()
   create(@CurrentUser() user: AuthUser, @Body() dto: CreateCustomerDto) {
-    return this.customersService.create(user.tenantId, dto);
+    return this.customersService.create(user.tenantId, user.storeId, dto);
   }
 
   @RequirePermission('customers.manage')
@@ -43,12 +43,12 @@ export class CustomersController {
     @Param('id') id: string,
     @Body() dto: UpdateCustomerDto,
   ) {
-    return this.customersService.update(user.tenantId, id, dto);
+    return this.customersService.update(user.storeId, id, dto);
   }
 
   @RequirePermission('customers.manage')
   @Delete(':id')
   remove(@CurrentUser() user: AuthUser, @Param('id') id: string) {
-    return this.customersService.remove(user.tenantId, id);
+    return this.customersService.remove(user.storeId, id);
   }
 }

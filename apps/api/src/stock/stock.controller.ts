@@ -20,7 +20,7 @@ export class StockController {
   @RequirePermission('products.view')
   @Get('low-stock')
   lowStock(@CurrentUser() user: AuthUser) {
-    return this.stockService.lowStock(user.tenantId);
+    return this.stockService.lowStock(user.tenantId, user.storeId);
   }
 
   @RequirePermission('products.view')
@@ -29,7 +29,7 @@ export class StockController {
     @CurrentUser() user: AuthUser,
     @Query() query: QueryStockMovementsDto,
   ) {
-    return this.stockService.listMovements(user.tenantId, query);
+    return this.stockService.listMovements(user.storeId, query);
   }
 
   @RequirePermission('products.view')
@@ -41,6 +41,7 @@ export class StockController {
   ) {
     return this.stockService.productMovements(
       user.tenantId,
+      user.storeId,
       productId,
       query,
     );
@@ -55,6 +56,7 @@ export class StockController {
   ) {
     return this.stockService.registerMovement(
       user.tenantId,
+      user.storeId,
       user.userId,
       productId,
       dto,

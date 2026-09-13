@@ -20,25 +20,30 @@ export class SalesController {
   @RequirePermission('reports.view')
   @Get()
   list(@CurrentUser() user: AuthUser, @Query() query: QuerySalesDto) {
-    return this.salesService.list(user.tenantId, query);
+    return this.salesService.list(user.storeId, query);
   }
 
   @RequirePermission('reports.view')
   @Get(':id')
   findOne(@CurrentUser() user: AuthUser, @Param('id') id: string) {
-    return this.salesService.findOne(user.tenantId, id);
+    return this.salesService.findOne(user.storeId, id);
   }
 
   @RequirePermission('sales.create')
   @Post()
   create(@CurrentUser() user: AuthUser, @Body() dto: CreateSaleDto) {
-    return this.salesService.create(user.tenantId, user.userId, dto);
+    return this.salesService.create(
+      user.tenantId,
+      user.storeId,
+      user.userId,
+      dto,
+    );
   }
 
   @RequirePermission('sales.cancel')
   @Post(':id/cancel')
   cancel(@CurrentUser() user: AuthUser, @Param('id') id: string) {
-    return this.salesService.cancel(user.tenantId, id, {
+    return this.salesService.cancel(user.storeId, id, {
       userId: user.userId,
       email: user.email,
     });

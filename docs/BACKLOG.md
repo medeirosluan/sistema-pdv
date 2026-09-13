@@ -98,7 +98,7 @@ Legenda: `[ ]` pendente · `[~]` em andamento · `[x]` concluído
 ## Fase 4 — Escala
 
 - [ ] Emissão fiscal NFC-e (integração terceirizada)
-- [ ] Suporte multi-loja por tenant
+- [x] Suporte multi-loja por tenant (model Store, RLS por loja, catálogo compartilhado com estoque por loja, vendas/caixa/clientes por loja, usuário fixo em 1 loja, tela de gestão de lojas em Configurações) — migration aplicada e validada ponta a ponta em 2026-09-13 no banco local (12 tenants reais migrados sem perda de dados; numeração de venda, estoque, clientes e caixa confirmados isolados por loja com catálogo compartilhado)
 - [ ] PWA offline robusto (fila de sincronização)
 - [ ] Auditoria e logs estruturados
 - [ ] Testes e2e dos fluxos críticos

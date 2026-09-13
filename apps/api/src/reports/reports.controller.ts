@@ -12,11 +12,11 @@ export class ReportsController {
 
   @Get('summary')
   summary(@CurrentUser() user: AuthUser) {
-    return this.reportsService.summary(user.tenantId);
+    return this.reportsService.summary(user.tenantId, user.storeId);
   }
 
   @Get('sales')
   sales(@CurrentUser() user: AuthUser, @Query() query: QuerySalesReportDto) {
-    return this.reportsService.salesReport(user.tenantId, query);
+    return this.reportsService.salesReport(user.storeId, query);
   }
 }

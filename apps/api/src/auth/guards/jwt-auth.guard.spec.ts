@@ -36,6 +36,8 @@ function baseUser(overrides: Record<string, unknown> = {}) {
       trialEndsAt: null,
       currentPeriodEnd: null,
     },
+    storeId: 'store-1',
+    store: { active: true },
     ...overrides,
   };
 }

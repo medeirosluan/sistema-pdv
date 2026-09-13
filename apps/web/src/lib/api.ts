@@ -26,6 +26,12 @@ export interface TenantInfo {
 
 export type UserRole = 'OWNER' | 'MANAGER' | 'CASHIER';
 
+export interface StoreInfo {
+  id: string;
+  name: string;
+  slug: string;
+}
+
 export interface UserInfo {
   id: string;
   name: string;
@@ -35,6 +41,7 @@ export interface UserInfo {
   twoFactorEnabled: boolean;
   permissions: string[];
   tenant: TenantInfo;
+  store: StoreInfo;
 }
 
 export interface AuthResponse {

@@ -75,6 +75,8 @@ function managedUser(overrides: Partial<ManagedUser> = {}): ManagedUser {
     role: 'CASHIER',
     active: true,
     permissions: [],
+    storeId: 'store-1',
+    store: { id: 'store-1', name: 'Loja principal' },
     createdAt: '',
     updatedAt: '',
     ...overrides,

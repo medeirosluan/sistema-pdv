@@ -15,7 +15,7 @@ import { effectivePermissions, type PermissionOverrides } from '../common/permis
 import { TERMS_VERSION } from '../common/legal.js';
 import { MailService } from '../mail/mail.module.js';
 import { TenantStatus, UserRole } from '../generated/prisma/enums.js';
-import type { TenantModel, UserModel } from '../generated/prisma/models.js';
+import type { StoreModel, TenantModel, UserModel } from '../generated/prisma/models.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { LoginDto } from './dto/login.dto.js';
 import { RegisterDto } from './dto/register.dto.js';
@@ -75,9 +75,17 @@ export class AuthService {
           termsVersion: TERMS_VERSION,
         },
       });
+      const store = await tx.store.create({
+        data: {
+          tenantId: tenant.id,
+          name: 'Loja principal',
+          slug: 'principal',
+        },
+      });
       return tx.user.create({
         data: {
           tenantId: tenant.id,
+          storeId: store.id,
           name: dto.name,
           email,
           passwordHash,
@@ -179,12 +187,12 @@ export class AuthService {
   async me(userId: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      include: { tenant: true },
+      include: { tenant: true, store: true },
     });
     if (!user) {
       throw new UnauthorizedException('Usuário não encontrado');
     }
-    return this.toPublicUser(user, user.tenant);
+    return this.toPublicUser(user, user.tenant, user.store);
   }
 
   async changePassword(userId: string, dto: ChangePasswordDto) {
@@ -369,6 +377,7 @@ export class AuthService {
     const payload: JwtPayload = {
       sub: user.id,
       tenantId: user.tenantId,
+      storeId: user.storeId,
       email: user.email,
       role: user.role,
       permissions,
@@ -385,18 +394,19 @@ export class AuthService {
       }),
     ]);
 
-    const tenant = await this.prisma.tenant.findUniqueOrThrow({
-      where: { id: user.tenantId },
-    });
+    const [tenant, store] = await Promise.all([
+      this.prisma.tenant.findUniqueOrThrow({ where: { id: user.tenantId } }),
+      this.prisma.store.findUniqueOrThrow({ where: { id: user.storeId } }),
+    ]);
 
     return {
       accessToken,
       refreshToken,
-      user: this.toPublicUser(user, tenant),
+      user: this.toPublicUser(user, tenant, store),
     };
   }
 
-  private toPublicUser(user: UserModel, tenant: TenantModel) {
+  private toPublicUser(user: UserModel, tenant: TenantModel, store: StoreModel) {
     return {
       id: user.id,
       name: user.name,
@@ -419,6 +429,11 @@ export class AuthService {
         settings: tenant.settings,
         plan: tenant.plan,
         status: tenant.status,
+      },
+      store: {
+        id: store.id,
+        name: store.name,
+        slug: store.slug,
       },
     };
   }

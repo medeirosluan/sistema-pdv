@@ -8,6 +8,7 @@ import {
 import { parseCsv, toCsv } from '../common/csv.js';
 import { Prisma } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { StockService } from '../stock/stock.service.js';
 import { TenantService } from '../tenant/tenant.service.js';
 import { CreateProductDto } from './dto/create-product.dto.js';
 import { QueryProductsDto } from './dto/query-products.dto.js';
@@ -18,9 +19,10 @@ export class ProductsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly tenantService: TenantService,
+    private readonly stockService: StockService,
   ) {}
 
-  async list(tenantId: string, query: QueryProductsDto) {
+  async list(tenantId: string, storeId: string, query: QueryProductsDto) {
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? 20;
 
@@ -59,8 +61,13 @@ export class ProductsService {
       this.prisma.product.count({ where }),
     ]);
 
+    const stockMap = await this.stockService.getStockMap(
+      storeId,
+      items.map((item) => item.id),
+    );
+
     return {
-      items,
+      items: items.map((item) => this.withStock(item, stockMap)),
       total,
       page,
       pageSize,
@@ -68,7 +75,7 @@ export class ProductsService {
     };
   }
 
-  async findOne(tenantId: string, id: string) {
+  async findOne(tenantId: string, storeId: string, id: string) {
     const product = await this.prisma.product.findFirst({
       where: { id, tenantId },
       include: { category: true },
@@ -76,10 +83,11 @@ export class ProductsService {
     if (!product) {
       throw new NotFoundException('Produto não encontrado');
     }
-    return product;
+    const stockMap = await this.stockService.getStockMap(storeId, [product.id]);
+    return this.withStock(product, stockMap);
   }
 
-  async create(tenantId: string, dto: CreateProductDto) {
+  async create(tenantId: string, storeId: string, dto: CreateProductDto) {
     await this.ensureCategory(tenantId, dto.categoryId);
     await this.ensureBarcodeAvailable(tenantId, dto.barcode);
     if (dto.parentId) {
@@ -98,7 +106,7 @@ export class ProductsService {
     const barcode =
       dto.barcode?.trim() || (await this.generateBarcode(tenantId));
 
-    return this.prisma.product.create({
+    const product = await this.prisma.product.create({
       data: {
         tenantId,
         name: dto.name.trim(),
@@ -107,8 +115,6 @@ export class ProductsService {
         price: dto.price,
         cost: dto.cost ?? null,
         unit: dto.unit?.trim() || 'UN',
-        stock: dto.stock ?? 0,
-        minStock: dto.minStock ?? 0,
         categoryId: dto.categoryId ?? null,
         active: dto.active ?? true,
         parentId: dto.parentId ?? null,
@@ -116,9 +122,26 @@ export class ProductsService {
       },
       include: { category: true },
     });
+
+    const stock = dto.stock ?? 0;
+    const minStock = dto.minStock ?? 0;
+    await this.stockService.upsertInitialStock(
+      tenantId,
+      storeId,
+      product.id,
+      stock,
+      minStock,
+    );
+
+    return { ...product, stock, minStock };
   }
 
-  async update(tenantId: string, id: string, dto: UpdateProductDto) {
+  async update(
+    tenantId: string,
+    storeId: string,
+    id: string,
+    dto: UpdateProductDto,
+  ) {
     const product = await this.findOwned(tenantId, id);
 
     if (dto.categoryId !== undefined) {
@@ -152,7 +175,7 @@ export class ProductsService {
       }
     }
 
-    return this.prisma.product.update({
+    const updated = await this.prisma.product.update({
       where: { id: product.id },
       data: {
         ...(dto.name !== undefined && { name: dto.name.trim() }),
@@ -161,8 +184,6 @@ export class ProductsService {
         ...(dto.price !== undefined && { price: dto.price }),
         ...(dto.cost !== undefined && { cost: dto.cost }),
         ...(dto.unit !== undefined && { unit: dto.unit.trim() || 'UN' }),
-        ...(dto.stock !== undefined && { stock: dto.stock }),
-        ...(dto.minStock !== undefined && { minStock: dto.minStock }),
         ...(dto.categoryId !== undefined && { categoryId: dto.categoryId }),
         ...(dto.active !== undefined && { active: dto.active }),
         ...(dto.parentId !== undefined && { parentId: dto.parentId }),
@@ -173,6 +194,32 @@ export class ProductsService {
       },
       include: { category: true },
     });
+
+    let stock: number;
+    let minStock: number;
+    if (dto.stock !== undefined || dto.minStock !== undefined) {
+      const current = await this.stockService.getOrCreateStock(
+        tenantId,
+        storeId,
+        product.id,
+      );
+      stock = dto.stock ?? Number(current.stock);
+      minStock = dto.minStock ?? Number(current.minStock);
+      await this.stockService.upsertInitialStock(
+        tenantId,
+        storeId,
+        product.id,
+        stock,
+        minStock,
+      );
+    } else {
+      const stockMap = await this.stockService.getStockMap(storeId, [product.id]);
+      const current = stockMap.get(product.id) ?? { stock: 0, minStock: 0 };
+      stock = current.stock;
+      minStock = current.minStock;
+    }
+
+    return { ...updated, stock, minStock };
   }
 
   async remove(tenantId: string, id: string) {
@@ -181,12 +228,16 @@ export class ProductsService {
     return { id: product.id };
   }
 
-  async exportCsv(tenantId: string) {
+  async exportCsv(tenantId: string, storeId: string) {
     const products = await this.prisma.product.findMany({
       where: { tenantId },
       include: { category: true },
       orderBy: { name: 'asc' },
     });
+    const stockMap = await this.stockService.getStockMap(
+      storeId,
+      products.map((product) => product.id),
+    );
     const header = [
       'nome',
       'codigo_barras',
@@ -199,25 +250,28 @@ export class ProductsService {
       'categoria',
       'ativo',
     ];
-    const rows = products.map((product) => [
-      product.name,
-      product.barcode ?? '',
-      product.sku ?? '',
-      Number(product.price).toFixed(2),
-      product.cost !== null ? Number(product.cost).toFixed(2) : '',
-      product.unit,
-      Number(product.stock),
-      Number(product.minStock),
-      product.category?.name ?? '',
-      product.active ? 'sim' : 'nao',
-    ]);
+    const rows = products.map((product) => {
+      const stock = stockMap.get(product.id);
+      return [
+        product.name,
+        product.barcode ?? '',
+        product.sku ?? '',
+        Number(product.price).toFixed(2),
+        product.cost !== null ? Number(product.cost).toFixed(2) : '',
+        product.unit,
+        stock?.stock ?? 0,
+        stock?.minStock ?? 0,
+        product.category?.name ?? '',
+        product.active ? 'sim' : 'nao',
+      ];
+    });
     return {
       filename: `produtos-${new Date().toISOString().slice(0, 10)}.csv`,
       csv: toCsv([header, ...rows]),
     };
   }
 
-  async importCsv(tenantId: string, csv: string) {
+  async importCsv(tenantId: string, storeId: string, csv: string) {
     const rows = parseCsv(csv);
     if (rows.length < 2) {
       throw new BadRequestException('CSV vazio ou sem linhas de dados');
@@ -278,13 +332,12 @@ export class ProductsService {
         price,
         cost,
         unit,
-        stock,
-        minStock,
         categoryId,
         active,
       };
 
       try {
+        let productId: string;
         if (existing) {
           await this.prisma.product.update({
             where: { id: existing.id },
@@ -295,6 +348,7 @@ export class ProductsService {
               ...(barcode ? { barcode } : {}),
             },
           });
+          productId = existing.id;
           updated += 1;
         } else {
           const { limits, usage, name: planName } =
@@ -305,7 +359,7 @@ export class ProductsService {
             );
             continue;
           }
-          await this.prisma.product.create({
+          const createdProduct = await this.prisma.product.create({
             data: {
               tenantId,
               ...data,
@@ -313,14 +367,30 @@ export class ProductsService {
               barcode: barcode ?? (await this.generateBarcode(tenantId)),
             },
           });
+          productId = createdProduct.id;
           created += 1;
         }
+        await this.stockService.upsertInitialStock(
+          tenantId,
+          storeId,
+          productId,
+          stock,
+          minStock,
+        );
       } catch {
         errors.push(`Linha ${line}: não foi possível salvar (dados duplicados?)`);
       }
     }
 
     return { created, updated, errors };
+  }
+
+  private withStock(
+    product: { id: string } & Record<string, unknown>,
+    stockMap: Map<string, { stock: number; minStock: number }>,
+  ) {
+    const stock = stockMap.get(product.id) ?? { stock: 0, minStock: 0 };
+    return { ...product, stock: stock.stock, minStock: stock.minStock };
   }
 
   private async ensureCategoryByName(tenantId: string, name: string) {

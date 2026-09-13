@@ -37,11 +37,13 @@ export class TenantTransactionInterceptor implements NestInterceptor {
 
     const bypass = isPlatformAdmin(user.email) ? 'on' : 'off';
     const tenantId = user.tenantId;
+    const storeId = user.storeId;
 
     return from(
       this.prisma.$transaction(
         async (tx) => {
           await tx.$executeRaw`SELECT set_config('app.tenant_id', ${tenantId}, true)`;
+          await tx.$executeRaw`SELECT set_config('app.store_id', ${storeId}, true)`;
           await tx.$executeRaw`SELECT set_config('app.bypass', ${bypass}, true)`;
           return tenantContext.run(tx, () => lastValueFrom(next.handle()));
         },

@@ -6,6 +6,7 @@ import {
   IsIn,
   IsOptional,
   IsString,
+  IsUUID,
   MaxLength,
   MinLength,
 } from 'class-validator';
@@ -18,6 +19,10 @@ export class UpdateUserDto {
   @MinLength(2)
   @MaxLength(120)
   name?: string;
+
+  @IsOptional()
+  @IsUUID()
+  storeId?: string;
 
   @IsOptional()
   @IsEmail()

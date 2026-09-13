@@ -9,11 +9,11 @@ import { UpdateCustomerDto } from './dto/update-customer.dto.js';
 export class CustomersService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async list(tenantId: string, query: QueryCustomersDto) {
+  async list(storeId: string, query: QueryCustomersDto) {
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? 20;
 
-    const where: Prisma.CustomerWhereInput = { tenantId };
+    const where: Prisma.CustomerWhereInput = { storeId };
     if (query.search?.trim()) {
       const search = query.search.trim();
       where.OR = [
@@ -43,9 +43,9 @@ export class CustomersService {
     };
   }
 
-  async findOne(tenantId: string, id: string) {
+  async findOne(storeId: string, id: string) {
     const customer = await this.prisma.customer.findFirst({
-      where: { id, tenantId },
+      where: { id, storeId },
     });
     if (!customer) {
       throw new NotFoundException('Cliente não encontrado');
@@ -53,10 +53,11 @@ export class CustomersService {
     return customer;
   }
 
-  create(tenantId: string, dto: CreateCustomerDto) {
+  create(tenantId: string, storeId: string, dto: CreateCustomerDto) {
     return this.prisma.customer.create({
       data: {
         tenantId,
+        storeId,
         name: dto.name.trim(),
         document: dto.document?.trim() || null,
         phone: dto.phone?.trim() || null,
@@ -65,8 +66,8 @@ export class CustomersService {
     });
   }
 
-  async update(tenantId: string, id: string, dto: UpdateCustomerDto) {
-    const customer = await this.findOne(tenantId, id);
+  async update(storeId: string, id: string, dto: UpdateCustomerDto) {
+    const customer = await this.findOne(storeId, id);
     return this.prisma.customer.update({
       where: { id: customer.id },
       data: {
@@ -80,8 +81,8 @@ export class CustomersService {
     });
   }
 
-  async remove(tenantId: string, id: string) {
-    const customer = await this.findOne(tenantId, id);
+  async remove(storeId: string, id: string) {
+    const customer = await this.findOne(storeId, id);
     await this.prisma.customer.delete({ where: { id: customer.id } });
     return { id: customer.id };
   }

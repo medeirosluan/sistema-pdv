@@ -40,13 +40,14 @@ export class CashRegisterService {
 
   async open(
     tenantId: string,
+    storeId: string,
     userId: string,
     dto: OpenCashRegisterDto,
     actor: { email: string },
   ) {
     if (dto.clientId) {
       const existingByClientId = await this.prisma.cashRegister.findFirst({
-        where: { tenantId, clientId: dto.clientId },
+        where: { storeId, clientId: dto.clientId },
         include: registerInclude,
       });
       if (existingByClientId) {
@@ -54,13 +55,14 @@ export class CashRegisterService {
       }
     }
 
-    const existing = await this.findOpen(tenantId);
+    const existing = await this.findOpen(storeId);
     if (existing) {
       throw new ConflictException('Já existe um caixa aberto');
     }
     const register = await this.prisma.cashRegister.create({
       data: {
         tenantId,
+        storeId,
         openedById: userId,
         clientId: dto.clientId ?? null,
         openingAmount: dto.openingAmount,
@@ -80,13 +82,13 @@ export class CashRegisterService {
     return register;
   }
 
-  async current(tenantId: string) {
-    const register = await this.findOpenDetailed(tenantId);
+  async current(storeId: string) {
+    const register = await this.findOpenDetailed(storeId);
     if (!register) {
       return null;
     }
     const summary = await this.buildSummary(
-      tenantId,
+      storeId,
       register.openedAt,
       null,
       register.movements,
@@ -97,19 +99,20 @@ export class CashRegisterService {
 
   async close(
     tenantId: string,
+    storeId: string,
     dto: CloseCashRegisterDto,
     actor: { userId: string; email: string },
   ) {
-    const register = await this.findOpenDetailed(tenantId);
+    const register = await this.findOpenDetailed(storeId);
     if (!register) {
       if (dto.clientId) {
         const alreadyClosed = await this.prisma.cashRegister.findFirst({
-          where: { tenantId, closeClientId: dto.clientId },
+          where: { storeId, closeClientId: dto.clientId },
           include: registerInclude,
         });
         if (alreadyClosed) {
           const closedSummary = await this.buildSummary(
-            tenantId,
+            storeId,
             alreadyClosed.openedAt,
             alreadyClosed.closedAt,
             alreadyClosed.movements,
@@ -129,7 +132,7 @@ export class CashRegisterService {
 
     const closedAt = new Date();
     const summary = await this.buildSummary(
-      tenantId,
+      storeId,
       register.openedAt,
       closedAt,
       register.movements,
@@ -171,20 +174,21 @@ export class CashRegisterService {
 
   async addMovement(
     tenantId: string,
+    storeId: string,
     dto: CreateCashMovementDto,
     actor: { userId: string; email: string },
   ) {
     if (dto.clientId) {
       const existing = await this.prisma.cashMovement.findUnique({
         where: { clientId: dto.clientId },
-        include: { cashRegister: { select: { tenantId: true } } },
+        include: { cashRegister: { select: { storeId: true } } },
       });
-      if (existing && existing.cashRegister.tenantId === tenantId) {
+      if (existing && existing.cashRegister.storeId === storeId) {
         return existing;
       }
     }
 
-    const register = await this.findOpen(tenantId);
+    const register = await this.findOpen(storeId);
     if (!register) {
       throw new NotFoundException('Nenhum caixa aberto');
     }
@@ -211,13 +215,13 @@ export class CashRegisterService {
     return movement;
   }
 
-  async history(tenantId: string, query: QueryCashRegisterDto) {
+  async history(storeId: string, query: QueryCashRegisterDto) {
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? 20;
 
     const [items, total] = await Promise.all([
       this.prisma.cashRegister.findMany({
-        where: { tenantId },
+        where: { storeId },
         include: {
           openedBy: { select: { id: true, name: true } },
           _count: { select: { movements: true } },
@@ -226,7 +230,7 @@ export class CashRegisterService {
         skip: (page - 1) * pageSize,
         take: pageSize,
       }),
-      this.prisma.cashRegister.count({ where: { tenantId } }),
+      this.prisma.cashRegister.count({ where: { storeId } }),
     ]);
 
     return {
@@ -238,22 +242,22 @@ export class CashRegisterService {
     };
   }
 
-  private findOpen(tenantId: string) {
+  private findOpen(storeId: string) {
     return this.prisma.cashRegister.findFirst({
-      where: { tenantId, status: CashRegisterStatus.OPEN },
+      where: { storeId, status: CashRegisterStatus.OPEN },
       include: { openedBy: { select: { id: true, name: true } } },
     });
   }
 
-  private findOpenDetailed(tenantId: string) {
+  private findOpenDetailed(storeId: string) {
     return this.prisma.cashRegister.findFirst({
-      where: { tenantId, status: CashRegisterStatus.OPEN },
+      where: { storeId, status: CashRegisterStatus.OPEN },
       include: registerInclude,
     });
   }
 
   private async buildSummary(
-    tenantId: string,
+    storeId: string,
     from: Date,
     to: Date | null,
     movements: { type: CashMovementType; amount: unknown }[],
@@ -261,7 +265,7 @@ export class CashRegisterService {
   ): Promise<CashSummary> {
     const sales = await this.prisma.sale.findMany({
       where: {
-        tenantId,
+        storeId,
         status: SaleStatus.FINISHED,
         createdAt: { gte: from, ...(to ? { lte: to } : {}) },
       },

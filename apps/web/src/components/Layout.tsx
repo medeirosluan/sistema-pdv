@@ -283,6 +283,7 @@ export function Layout() {
             <p className="truncate text-sm font-medium text-white">
               {user?.tenant.name}
             </p>
+            <p className="truncate text-xs text-slate-500">{user?.store?.name}</p>
             <p className="truncate text-xs text-slate-500">
               {user?.name} · {user ? roleLabels[user.role] : ''}
             </p>

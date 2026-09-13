@@ -14,7 +14,8 @@ export type Permission =
   | 'cash.operate'
   | 'users.manage'
   | 'owners.manage'
-  | 'settings.manage';
+  | 'settings.manage'
+  | 'stores.manage';
 
 export interface PermissionDef {
   key: Permission;
@@ -101,6 +102,12 @@ export const PERMISSIONS: PermissionDef[] = [
     label: 'Editar configurações da loja',
     group: 'Administração',
     roles: ['OWNER', 'MANAGER'],
+  },
+  {
+    key: 'stores.manage',
+    label: 'Gerenciar lojas/filiais',
+    group: 'Administração',
+    roles: ['OWNER'],
   },
 ];
 

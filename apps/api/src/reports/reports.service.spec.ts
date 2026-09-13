@@ -11,6 +11,8 @@ function createPrismaMock() {
     },
     product: {
       count: vi.fn(),
+    },
+    productStock: {
       findMany: vi.fn(),
     },
     customer: {
@@ -42,7 +44,7 @@ describe('ReportsService', () => {
       prisma.product.count
         .mockResolvedValueOnce(20) // total
         .mockResolvedValueOnce(18); // active
-      prisma.product.findMany.mockResolvedValue([
+      prisma.productStock.findMany.mockResolvedValue([
         { stock: 10, minStock: 5 },
         { stock: 2, minStock: 5 },
         { stock: 5, minStock: 5 },
@@ -52,7 +54,7 @@ describe('ReportsService', () => {
         .mockResolvedValueOnce([]) // recentSales
         .mockResolvedValueOnce([]); // chartSales
 
-      const summary = await service.summary('tenant-1');
+      const summary = await service.summary('tenant-1', 'store-1');
 
       expect(summary.today).toEqual({ total: 100, count: 2 });
       expect(summary.month).toEqual({ total: 500, count: 10 });
@@ -71,11 +73,11 @@ describe('ReportsService', () => {
         .mockResolvedValueOnce({ _sum: { total: null }, _count: 0 })
         .mockResolvedValueOnce({ _sum: { total: null }, _count: 0 });
       prisma.product.count.mockResolvedValue(0);
-      prisma.product.findMany.mockResolvedValue([]);
+      prisma.productStock.findMany.mockResolvedValue([]);
       prisma.customer.count.mockResolvedValue(0);
       prisma.sale.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
 
-      const summary = await service.summary('tenant-1');
+      const summary = await service.summary('tenant-1', 'store-1');
 
       expect(summary.averageTicket).toBe(0);
     });
@@ -85,7 +87,7 @@ describe('ReportsService', () => {
         .mockResolvedValueOnce({ _sum: { total: 0 }, _count: 0 })
         .mockResolvedValueOnce({ _sum: { total: 0 }, _count: 0 });
       prisma.product.count.mockResolvedValue(0);
-      prisma.product.findMany.mockResolvedValue([]);
+      prisma.productStock.findMany.mockResolvedValue([]);
       prisma.customer.count.mockResolvedValue(0);
       prisma.sale.findMany
         .mockResolvedValueOnce([]) // recentSales
@@ -94,7 +96,7 @@ describe('ReportsService', () => {
           { createdAt: new Date('2026-01-15T18:00:00'), total: 20 },
         ]);
 
-      const summary = await service.summary('tenant-1');
+      const summary = await service.summary('tenant-1', 'store-1');
 
       const today = summary.salesByDay.find((d) => d.date === '2026-01-15');
       expect(today).toEqual({ date: '2026-01-15', total: 50, count: 2 });
@@ -140,7 +142,7 @@ describe('ReportsService', () => {
         },
       ]);
 
-      const report = await service.salesReport('tenant-1', {
+      const report = await service.salesReport('store-1', {
         from: '2026-01-01',
         to: '2026-01-31',
       } as never);
@@ -179,7 +181,7 @@ describe('ReportsService', () => {
     it('usa período padrão dos últimos 30 dias quando from/to não são informados', async () => {
       prisma.sale.findMany.mockResolvedValue([]);
 
-      const report = await service.salesReport('tenant-1', {} as never);
+      const report = await service.salesReport('store-1', {} as never);
 
       const from = new Date(report.period.from);
       const to = new Date(report.period.to);

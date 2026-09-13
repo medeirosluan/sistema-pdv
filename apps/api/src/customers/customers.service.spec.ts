@@ -26,10 +26,10 @@ describe('CustomersService', () => {
   });
 
   describe('findOne', () => {
-    it('lança NotFoundException quando o cliente não pertence ao tenant', async () => {
+    it('lança NotFoundException quando o cliente não pertence à loja', async () => {
       prisma.customer.findFirst.mockResolvedValue(null);
 
-      await expect(service.findOne('tenant-1', 'inexistente')).rejects.toThrow(
+      await expect(service.findOne('store-1', 'inexistente')).rejects.toThrow(
         NotFoundException,
       );
     });
@@ -39,7 +39,7 @@ describe('CustomersService', () => {
     it('normaliza campos opcionais vazios para null e remove espaços', async () => {
       prisma.customer.create.mockResolvedValue({ id: 'c1' });
 
-      await service.create('tenant-1', {
+      await service.create('tenant-1', 'store-1', {
         name: '  João  ',
         document: '',
         phone: undefined,
@@ -49,6 +49,7 @@ describe('CustomersService', () => {
       expect(prisma.customer.create).toHaveBeenCalledWith({
         data: {
           tenantId: 'tenant-1',
+          storeId: 'store-1',
           name: 'João',
           document: null,
           phone: null,
@@ -63,7 +64,7 @@ describe('CustomersService', () => {
       prisma.customer.findFirst.mockResolvedValue(null);
 
       await expect(
-        service.update('tenant-1', 'inexistente', { name: 'X' } as never),
+        service.update('store-1', 'inexistente', { name: 'X' } as never),
       ).rejects.toThrow(NotFoundException);
     });
 
@@ -71,7 +72,7 @@ describe('CustomersService', () => {
       prisma.customer.findFirst.mockResolvedValue({ id: 'c1' });
       prisma.customer.update.mockResolvedValue({ id: 'c1', name: 'Novo nome' });
 
-      await service.update('tenant-1', 'c1', { name: 'Novo nome' } as never);
+      await service.update('store-1', 'c1', { name: 'Novo nome' } as never);
 
       expect(prisma.customer.update).toHaveBeenCalledWith({
         where: { id: 'c1' },
@@ -81,10 +82,10 @@ describe('CustomersService', () => {
   });
 
   describe('remove', () => {
-    it('remove o cliente quando ele pertence ao tenant', async () => {
+    it('remove o cliente quando ele pertence à loja', async () => {
       prisma.customer.findFirst.mockResolvedValue({ id: 'c1' });
 
-      const result = await service.remove('tenant-1', 'c1');
+      const result = await service.remove('store-1', 'c1');
 
       expect(result).toEqual({ id: 'c1' });
       expect(prisma.customer.delete).toHaveBeenCalledWith({

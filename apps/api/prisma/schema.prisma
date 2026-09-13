@@ -97,6 +97,31 @@ model Tenant {
   sales         Sale[]
   cashRegisters CashRegister[]
   stockMovements StockMovement[]
+  stores        Store[]
+  productStocks ProductStock[]
+}
+
+// ---------------------------------------------------------------- Lojas
+
+model Store {
+  id        String   @id @default(uuid())
+  tenantId  String
+  name      String
+  slug      String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  users          User[]
+  customers      Customer[]
+  sales          Sale[]
+  cashRegisters  CashRegister[]
+  stockMovements StockMovement[]
+  productStocks  ProductStock[]
+
+  @@unique([tenantId, slug])
+  @@index([tenantId])
 }
 
 // ---------------------------------------------------------------- Usuários
@@ -104,6 +129,7 @@ model Tenant {
 model User {
   id           String   @id @default(uuid())
   tenantId     String
+  storeId      String
   name         String
   email        String
   passwordHash String
@@ -119,6 +145,7 @@ model User {
   updatedAt    DateTime @updatedAt
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  store  Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
 
   sales         Sale[]
   cashRegisters CashRegister[]
@@ -126,6 +153,7 @@ model User {
 
   @@unique([tenantId, email])
   @@index([tenantId])
+  @@index([storeId])
 }
 
 // ---------------------------------------------------------------- Catálogo
@@ -156,8 +184,6 @@ model Product {
   price        Decimal  @db.Decimal(10, 2)
   cost         Decimal? @db.Decimal(10, 2)
   unit         String   @default("UN")
-  stock        Decimal  @default(0) @db.Decimal(12, 3)
-  minStock     Decimal  @default(0) @db.Decimal(12, 3)
   active       Boolean  @default(true)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -168,6 +194,7 @@ model Product {
   variants  Product[]  @relation("ProductVariants")
   saleItems SaleItem[]
   stockMovements StockMovement[]
+  stocks    ProductStock[]
 
   @@unique([tenantId, barcode])
   @@index([tenantId])
@@ -175,11 +202,32 @@ model Product {
   @@index([parentId])
 }
 
+// ---------------------------------------------------------------- Estoque por loja
+
+model ProductStock {
+  id        String   @id @default(uuid())
+  tenantId  String
+  storeId   String
+  productId String
+  stock     Decimal  @default(0) @db.Decimal(12, 3)
+  minStock  Decimal  @default(0) @db.Decimal(12, 3)
+  updatedAt DateTime @updatedAt
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  store   Store   @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, productId])
+  @@index([tenantId])
+  @@index([storeId])
+}
+
 // ---------------------------------------------------------------- Clientes
 
 model Customer {
   id        String   @id @default(uuid())
   tenantId  String
+  storeId   String
   name      String
   document  String?
   phone     String?
@@ -188,10 +236,12 @@ model Customer {
   updatedAt DateTime @updatedAt
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  store  Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
   sales  Sale[]
 
   @@index([tenantId])
-  @@index([tenantId, name])
+  @@index([storeId])
+  @@index([storeId, name])
 }
 
 // ---------------------------------------------------------------- Vendas
@@ -199,6 +249,7 @@ model Customer {
 model Sale {
   id         String     @id @default(uuid())
   tenantId   String
+  storeId    String
   clientId   String?
   customerId String?
   number     Int
@@ -212,15 +263,16 @@ model Sale {
   updatedAt  DateTime   @updatedAt
 
   tenant    Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  store     Store      @relation(fields: [storeId], references: [id], onDelete: Cascade)
   customer  Customer?  @relation(fields: [customerId], references: [id], onDelete: SetNull)
   createdBy User       @relation(fields: [createdById], references: [id])
   items     SaleItem[]
   payments  Payment[]
 
-  @@unique([tenantId, number])
-  @@unique([tenantId, clientId])
+  @@unique([storeId, number])
+  @@unique([storeId, clientId])
   @@index([tenantId])
-  @@index([tenantId, createdAt])
+  @@index([storeId, createdAt])
 }
 
 model SaleItem {
@@ -257,6 +309,7 @@ model Payment {
 model CashRegister {
   id            String             @id @default(uuid())
   tenantId      String
+  storeId       String
   openedById    String
   clientId      String?            @unique
   closeClientId String?            @unique
@@ -269,11 +322,12 @@ model CashRegister {
   updatedAt     DateTime           @updatedAt
 
   tenant   Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  store    Store          @relation(fields: [storeId], references: [id], onDelete: Cascade)
   openedBy User           @relation(fields: [openedById], references: [id])
   movements CashMovement[]
 
   @@index([tenantId])
-  @@index([tenantId, status])
+  @@index([storeId, status])
 }
 
 model CashMovement {
@@ -295,6 +349,7 @@ model CashMovement {
 model StockMovement {
   id            String            @id @default(uuid())
   tenantId      String
+  storeId       String
   productId     String
   type          StockMovementType
   quantity      Decimal           @db.Decimal(12, 3)
@@ -305,12 +360,13 @@ model StockMovement {
   createdAt     DateTime          @default(now())
 
   tenant    Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  store     Store   @relation(fields: [storeId], references: [id], onDelete: Cascade)
   product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
   createdBy User    @relation(fields: [createdById], references: [id])
 
   @@index([tenantId])
   @@index([productId])
-  @@index([tenantId, createdAt])
+  @@index([storeId, createdAt])
 }
 
 // ---------------------------------------------------------------- Auditoria

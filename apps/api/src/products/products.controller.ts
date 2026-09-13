@@ -23,30 +23,34 @@ export class ProductsController {
 
   @Get()
   list(@CurrentUser() user: AuthUser, @Query() query: QueryProductsDto) {
-    return this.productsService.list(user.tenantId, query);
+    return this.productsService.list(user.tenantId, user.storeId, query);
   }
 
   @RequirePermission('products.view')
   @Get('export')
   exportCsv(@CurrentUser() user: AuthUser) {
-    return this.productsService.exportCsv(user.tenantId);
+    return this.productsService.exportCsv(user.tenantId, user.storeId);
   }
 
   @RequirePermission('products.manage')
   @Post('import')
   importCsv(@CurrentUser() user: AuthUser, @Body() dto: ImportProductsDto) {
-    return this.productsService.importCsv(user.tenantId, dto.csv);
+    return this.productsService.importCsv(
+      user.tenantId,
+      user.storeId,
+      dto.csv,
+    );
   }
 
   @Get(':id')
   findOne(@CurrentUser() user: AuthUser, @Param('id') id: string) {
-    return this.productsService.findOne(user.tenantId, id);
+    return this.productsService.findOne(user.tenantId, user.storeId, id);
   }
 
   @RequirePermission('products.manage')
   @Post()
   create(@CurrentUser() user: AuthUser, @Body() dto: CreateProductDto) {
-    return this.productsService.create(user.tenantId, dto);
+    return this.productsService.create(user.tenantId, user.storeId, dto);
   }
 
   @RequirePermission('products.manage')
@@ -56,7 +60,7 @@ export class ProductsController {
     @Param('id') id: string,
     @Body() dto: UpdateProductDto,
   ) {
-    return this.productsService.update(user.tenantId, id, dto);
+    return this.productsService.update(user.tenantId, user.storeId, id, dto);
   }
 
   @RequirePermission('products.manage')

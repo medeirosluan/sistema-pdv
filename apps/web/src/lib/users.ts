@@ -9,6 +9,8 @@ export interface ManagedUser {
   role: UserRole;
   active: boolean;
   permissions: Permission[];
+  storeId: string;
+  store: { id: string; name: string };
   createdAt: string;
   updatedAt: string;
 }
@@ -18,6 +20,7 @@ export interface CreateUserInput {
   email: string;
   password: string;
   role: UserRole;
+  storeId: string;
   permissions?: Permission[];
 }
 
@@ -26,6 +29,7 @@ export interface UpdateUserInput {
   email?: string;
   role?: UserRole;
   active?: boolean;
+  storeId?: string;
   permissions?: Permission[];
 }
 

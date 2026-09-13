@@ -33,6 +33,7 @@ function baseUser(overrides: Partial<Record<string, unknown>> = {}) {
   return {
     id: 'user-1',
     tenantId: 'tenant-1',
+    storeId: 'store-1',
     email: 'demo@example.com',
     name: 'Demo',
     passwordHash: 'hash',
@@ -46,11 +47,27 @@ function baseUser(overrides: Partial<Record<string, unknown>> = {}) {
   };
 }
 
+function baseStore(overrides: Partial<Record<string, unknown>> = {}) {
+  return {
+    id: 'store-1',
+    tenantId: 'tenant-1',
+    name: 'Loja principal',
+    slug: 'principal',
+    active: true,
+    ...overrides,
+  };
+}
+
 function createPrismaMock() {
   const prisma: Record<string, any> = {
     tenant: {
       findUnique: vi.fn(),
       findUniqueOrThrow: vi.fn(async () => baseTenant()),
+      create: vi.fn(),
+    },
+    store: {
+      findUnique: vi.fn(),
+      findUniqueOrThrow: vi.fn(async () => baseStore()),
       create: vi.fn(),
     },
     user: {

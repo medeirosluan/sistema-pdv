@@ -4,6 +4,7 @@ import { UserRole } from '../generated/prisma/enums.js';
 import type { AuthUser } from '../auth/types/auth-user.js';
 import type { AuditService } from '../audit/audit.service.js';
 import type { PrismaService } from '../prisma/prisma.service.js';
+import type { StoresService } from '../stores/stores.service.js';
 import type { TenantService } from '../tenant/tenant.service.js';
 import { UsersService } from './users.service.js';
 
@@ -44,6 +45,7 @@ describe('UsersService', () => {
   let prisma: ReturnType<typeof createPrismaMock>;
   let tenantService: { getPlanInfo: ReturnType<typeof vi.fn> };
   let audit: { log: ReturnType<typeof vi.fn> };
+  let storesService: { ensureBelongsToTenant: ReturnType<typeof vi.fn> };
   let service: UsersService;
 
   beforeEach(() => {
@@ -56,10 +58,12 @@ describe('UsersService', () => {
       })),
     };
     audit = { log: vi.fn() };
+    storesService = { ensureBelongsToTenant: vi.fn(async () => ({ id: 'store-1' })) };
     service = new UsersService(
       prisma as unknown as PrismaService,
       tenantService as unknown as TenantService,
       audit as unknown as AuditService,
+      storesService as unknown as StoresService,
     );
   });
 

@@ -1,5 +1,6 @@
 import { Check, X } from 'lucide-react';
 import { Fragment, useEffect, useState, type FormEvent } from 'react';
+import { StoresSection } from '../components/StoresSection';
 import { useConfirm } from '../components/ui/useConfirm';
 import { ApiError, type TenantInfo, type UserRole } from '../lib/api';
 import { api } from '../lib/api';
@@ -93,6 +94,7 @@ export function Settings() {
 
   const can = useCan();
   const canEdit = can('settings.manage');
+  const canManageStores = can('stores.manage');
 
   useEffect(() => {
     if (!isTauri()) {
@@ -868,6 +870,8 @@ export function Settings() {
           )}
         </div>
       )}
+
+      {canManageStores && <StoresSection />}
 
       <form
         onSubmit={changePassword}

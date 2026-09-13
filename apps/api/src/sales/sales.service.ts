@@ -30,11 +30,11 @@ export class SalesService {
     private readonly audit: AuditService,
   ) {}
 
-  async list(tenantId: string, query: QuerySalesDto) {
+  async list(storeId: string, query: QuerySalesDto) {
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? 20;
 
-    const where: Prisma.SaleWhereInput = { tenantId };
+    const where: Prisma.SaleWhereInput = { storeId };
     if (query.status) {
       where.status = query.status;
     }
@@ -65,9 +65,9 @@ export class SalesService {
     };
   }
 
-  async findOne(tenantId: string, id: string) {
+  async findOne(storeId: string, id: string) {
     const sale = await this.prisma.sale.findFirst({
-      where: { id, tenantId },
+      where: { id, storeId },
       include: saleInclude,
     });
     if (!sale) {
@@ -76,10 +76,15 @@ export class SalesService {
     return sale;
   }
 
-  async create(tenantId: string, userId: string, dto: CreateSaleDto) {
+  async create(
+    tenantId: string,
+    storeId: string,
+    userId: string,
+    dto: CreateSaleDto,
+  ) {
     if (dto.clientId) {
       const existing = await this.prisma.sale.findFirst({
-        where: { tenantId, clientId: dto.clientId },
+        where: { storeId, clientId: dto.clientId },
         include: saleInclude,
       });
       if (existing) {
@@ -88,7 +93,7 @@ export class SalesService {
     }
 
     const openRegister = await this.prisma.cashRegister.findFirst({
-      where: { tenantId, status: CashRegisterStatus.OPEN },
+      where: { storeId, status: CashRegisterStatus.OPEN },
     });
     if (!openRegister) {
       throw new ConflictException('Abra o caixa antes de registrar uma venda');
@@ -96,7 +101,7 @@ export class SalesService {
 
     if (dto.customerId) {
       const customer = await this.prisma.customer.findFirst({
-        where: { id: dto.customerId, tenantId },
+        where: { id: dto.customerId, storeId },
       });
       if (!customer) {
         throw new NotFoundException('Cliente não encontrado');
@@ -156,7 +161,7 @@ export class SalesService {
 
     return this.prisma.$transaction(async (tx) => {
       const last = await tx.sale.findFirst({
-        where: { tenantId },
+        where: { storeId },
         orderBy: { number: 'desc' },
         select: { number: true },
       });
@@ -165,6 +170,7 @@ export class SalesService {
       const sale = await tx.sale.create({
         data: {
           tenantId,
+          storeId,
           clientId: dto.clientId ?? null,
           customerId: dto.customerId ?? null,
           number,
@@ -188,19 +194,26 @@ export class SalesService {
 
       for (const item of itemsData) {
         if (item.productId) {
-          const updatedProduct = await tx.product.update({
-            where: { id: item.productId },
-            data: { stock: { decrement: item.quantity } },
-            select: { stock: true },
+          const stockRow = await this.getOrCreateStockInTx(
+            tx,
+            tenantId,
+            storeId,
+            item.productId,
+          );
+          const previousStock = Number(stockRow.stock);
+          const newStock = previousStock - item.quantity;
+          await tx.productStock.update({
+            where: { id: stockRow.id },
+            data: { stock: newStock },
           });
-          const newStock = Number(updatedProduct.stock);
           await tx.stockMovement.create({
             data: {
               tenantId,
+              storeId,
               productId: item.productId,
               type: StockMovementType.OUT,
               quantity: item.quantity,
-              previousStock: newStock + item.quantity,
+              previousStock,
               newStock,
               reason: `Venda #${number}`,
               createdById: userId,
@@ -214,12 +227,12 @@ export class SalesService {
   }
 
   async cancel(
-    tenantId: string,
+    storeId: string,
     id: string,
     actor: { userId: string; email: string },
   ) {
     const sale = await this.prisma.sale.findFirst({
-      where: { id, tenantId },
+      where: { id, storeId },
       include: { items: true },
     });
     if (!sale) {
@@ -239,19 +252,26 @@ export class SalesService {
       for (const item of sale.items) {
         if (item.productId) {
           const quantity = Number(item.quantity);
-          const updatedProduct = await tx.product.update({
-            where: { id: item.productId },
-            data: { stock: { increment: quantity } },
-            select: { stock: true },
+          const stockRow = await this.getOrCreateStockInTx(
+            tx,
+            sale.tenantId,
+            storeId,
+            item.productId,
+          );
+          const previousStock = Number(stockRow.stock);
+          const newStock = previousStock + quantity;
+          await tx.productStock.update({
+            where: { id: stockRow.id },
+            data: { stock: newStock },
           });
-          const newStock = Number(updatedProduct.stock);
           await tx.stockMovement.create({
             data: {
-              tenantId,
+              tenantId: sale.tenantId,
+              storeId,
               productId: item.productId,
               type: StockMovementType.IN,
               quantity,
-              previousStock: newStock - quantity,
+              previousStock,
               newStock,
               reason: `Cancelamento da venda #${sale.number}`,
               createdById: actor.userId,
@@ -261,7 +281,7 @@ export class SalesService {
       }
 
       await this.audit.log({
-        tenantId,
+        tenantId: sale.tenantId,
         userId: actor.userId,
         userName: actor.email,
         action: 'sale.cancel',
@@ -271,6 +291,23 @@ export class SalesService {
       });
 
       return updated;
+    });
+  }
+
+  private async getOrCreateStockInTx(
+    tx: Prisma.TransactionClient,
+    tenantId: string,
+    storeId: string,
+    productId: string,
+  ) {
+    const existing = await tx.productStock.findUnique({
+      where: { storeId_productId: { storeId, productId } },
+    });
+    if (existing) {
+      return existing;
+    }
+    return tx.productStock.create({
+      data: { tenantId, storeId, productId, stock: 0, minStock: 0 },
     });
   }
 }

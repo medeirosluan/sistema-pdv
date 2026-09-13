@@ -18,28 +18,32 @@ const movementInclude = {
 export class StockService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async lowStock(tenantId: string) {
-    const products = await this.prisma.product.findMany({
-      where: { tenantId, active: true },
+  async lowStock(tenantId: string, storeId: string) {
+    const stocks = await this.prisma.productStock.findMany({
+      where: { tenantId, storeId, product: { active: true } },
       select: {
-        id: true,
-        name: true,
-        unit: true,
         stock: true,
         minStock: true,
+        product: { select: { id: true, name: true, unit: true } },
       },
-      orderBy: { name: 'asc' },
     });
-    return products.filter(
-      (product) => Number(product.stock) <= Number(product.minStock),
-    );
+    return stocks
+      .filter((item) => Number(item.stock) <= Number(item.minStock))
+      .map((item) => ({
+        id: item.product.id,
+        name: item.product.name,
+        unit: item.product.unit,
+        stock: item.stock,
+        minStock: item.minStock,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
   }
 
-  async listMovements(tenantId: string, query: QueryStockMovementsDto) {
+  async listMovements(storeId: string, query: QueryStockMovementsDto) {
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? 20;
 
-    const where: Prisma.StockMovementWhereInput = { tenantId };
+    const where: Prisma.StockMovementWhereInput = { storeId };
     if (query.productId) {
       where.productId = query.productId;
     }
@@ -69,21 +73,24 @@ export class StockService {
 
   async productMovements(
     tenantId: string,
+    storeId: string,
     productId: string,
     query: QueryStockMovementsDto,
   ) {
     await this.ensureProduct(tenantId, productId);
-    return this.listMovements(tenantId, { ...query, productId });
+    return this.listMovements(storeId, { ...query, productId });
   }
 
   async registerMovement(
     tenantId: string,
+    storeId: string,
     userId: string,
     productId: string,
     dto: CreateStockMovementDto,
   ) {
-    const product = await this.ensureProduct(tenantId, productId);
-    const previous = Number(product.stock);
+    await this.ensureProduct(tenantId, productId);
+    const stockRow = await this.getOrCreateStock(tenantId, storeId, productId);
+    const previous = Number(stockRow.stock);
 
     let newStock: number;
     if (dto.type === StockMovementType.IN) {
@@ -107,7 +114,8 @@ export class StockService {
       const movement = await tx.stockMovement.create({
         data: {
           tenantId,
-          productId: product.id,
+          storeId,
+          productId,
           type: dto.type,
           quantity: dto.quantity,
           previousStock: previous,
@@ -118,13 +126,60 @@ export class StockService {
         include: movementInclude,
       });
 
-      const updated = await tx.product.update({
-        where: { id: product.id },
+      const stock = await tx.productStock.update({
+        where: { storeId_productId: { storeId, productId } },
         data: { stock: newStock },
+      });
+
+      const product = await tx.product.findUniqueOrThrow({
+        where: { id: productId },
         include: { category: true },
       });
 
-      return { movement, product: updated };
+      return { movement, product: { ...product, stock: stock.stock, minStock: stock.minStock } };
+    });
+  }
+
+  /** Retorna a linha de estoque da loja para o produto, criando-a (zerada) se ainda não existir. */
+  async getOrCreateStock(tenantId: string, storeId: string, productId: string) {
+    const existing = await this.prisma.productStock.findUnique({
+      where: { storeId_productId: { storeId, productId } },
+    });
+    if (existing) {
+      return existing;
+    }
+    return this.prisma.productStock.create({
+      data: { tenantId, storeId, productId, stock: 0, minStock: 0 },
+    });
+  }
+
+  async getStockMap(storeId: string, productIds: string[]) {
+    if (productIds.length === 0) {
+      return new Map<string, { stock: number; minStock: number }>();
+    }
+    const rows = await this.prisma.productStock.findMany({
+      where: { storeId, productId: { in: productIds } },
+    });
+    return new Map(
+      rows.map((row) => [
+        row.productId,
+        { stock: Number(row.stock), minStock: Number(row.minStock) },
+      ]),
+    );
+  }
+
+  /** Define o estoque inicial de um produto numa loja (usado na criação/importação). */
+  async upsertInitialStock(
+    tenantId: string,
+    storeId: string,
+    productId: string,
+    stock: number,
+    minStock: number,
+  ) {
+    return this.prisma.productStock.upsert({
+      where: { storeId_productId: { storeId, productId } },
+      update: { stock, minStock },
+      create: { tenantId, storeId, productId, stock, minStock },
     });
   }
 

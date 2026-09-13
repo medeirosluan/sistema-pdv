@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import type { UserRole } from '../lib/api';
 import { ApiError } from '../lib/api';
 import {
@@ -7,6 +7,8 @@ import {
   rolePermissions,
   type Permission,
 } from '../lib/permissions';
+import { storesApi, type Store } from '../lib/stores';
+import { useAuth } from '../lib/useAuth';
 import { usersApi, type ManagedUser } from '../lib/users';
 import { Modal } from './Modal';
 
@@ -25,16 +27,20 @@ interface FormState {
   role: UserRole;
   active: boolean;
   permissions: Permission[];
+  storeId: string;
 }
 
-const emptyForm: FormState = {
-  name: '',
-  email: '',
-  password: '',
-  role: 'CASHIER',
-  active: true,
-  permissions: rolePermissions('CASHIER'),
-};
+function emptyForm(defaultStoreId: string): FormState {
+  return {
+    name: '',
+    email: '',
+    password: '',
+    role: 'CASHIER',
+    active: true,
+    permissions: rolePermissions('CASHIER'),
+    storeId: defaultStoreId,
+  };
+}
 
 const inputClass =
   'w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20';
@@ -52,9 +58,20 @@ export function UserFormModal({
   onClose,
   onSaved,
 }: UserFormModalProps) {
-  const [form, setForm] = useState<FormState>(emptyForm);
+  const { user: currentUser } = useAuth();
+  const [form, setForm] = useState<FormState>(() =>
+    emptyForm(currentUser?.store.id ?? ''),
+  );
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [stores, setStores] = useState<Store[]>([]);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    void storesApi.list().then(setStores).catch(() => setStores([]));
+  }, [open]);
 
   const resetKey = open ? (user?.id ?? 'new') : null;
   const [appliedResetKey, setAppliedResetKey] = useState<string | null>(null);
@@ -70,9 +87,10 @@ export function UserFormModal({
           role: user.role,
           active: user.active,
           permissions: user.permissions,
+          storeId: user.storeId,
         });
       } else {
-        setForm(emptyForm);
+        setForm(emptyForm(currentUser?.store.id ?? ''));
       }
     }
   }
@@ -110,6 +128,7 @@ export function UserFormModal({
           role: form.role,
           active: form.active,
           permissions: form.permissions,
+          storeId: form.storeId,
         });
       } else {
         await usersApi.create({
@@ -118,6 +137,7 @@ export function UserFormModal({
           password: form.password,
           role: form.role,
           permissions: form.permissions,
+          storeId: form.storeId,
         });
       }
       onSaved();
@@ -215,6 +235,26 @@ export function UserFormModal({
               ))}
           </select>
         </label>
+
+        {stores.length > 1 && (
+          <label className="block">
+            <span className="mb-1.5 block text-sm font-medium text-slate-700">
+              Loja
+            </span>
+            <select
+              className={inputClass}
+              value={form.storeId}
+              onChange={(e) => update('storeId', e.target.value)}
+              required
+            >
+              {stores.map((store) => (
+                <option key={store.id} value={store.id}>
+                  {store.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
 
         <div className="rounded-xl border border-slate-200 p-3">
           <div className="flex items-center justify-between">

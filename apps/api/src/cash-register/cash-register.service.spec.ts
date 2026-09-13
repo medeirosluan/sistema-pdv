@@ -50,6 +50,7 @@ describe('CashRegisterService', () => {
       await expect(
         service.open(
           'tenant-1',
+          'store-1',
           'user-1',
           { openingAmount: 100 } as never,
           { email: 'demo@example.com' },
@@ -63,6 +64,7 @@ describe('CashRegisterService', () => {
 
       const result = await service.open(
         'tenant-1',
+        'store-1',
         'user-1',
         { openingAmount: 100 } as never,
         { email: 'demo@example.com' },
@@ -82,6 +84,7 @@ describe('CashRegisterService', () => {
 
       const result = await service.open(
         'tenant-1',
+        'store-1',
         'user-1',
         { clientId: 'client-abc', openingAmount: 100 } as never,
         { email: 'demo@example.com' },
@@ -99,6 +102,7 @@ describe('CashRegisterService', () => {
       await expect(
         service.close(
           'tenant-1',
+          'store-1',
           { closingAmount: 100 } as never,
           { userId: 'user-1', email: 'demo@example.com' },
         ),
@@ -130,6 +134,7 @@ describe('CashRegisterService', () => {
 
       const result = await service.close(
         'tenant-1',
+        'store-1',
         { closingAmount: 170 } as never,
         { userId: 'user-1', email: 'demo@example.com' },
       );
@@ -141,7 +146,7 @@ describe('CashRegisterService', () => {
       expect(prisma.sale.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
-            tenantId: 'tenant-1',
+            storeId: 'store-1',
             status: SaleStatus.FINISHED,
           }),
         }),
@@ -164,6 +169,7 @@ describe('CashRegisterService', () => {
 
       const result = await service.close(
         'tenant-1',
+        'store-1',
         { clientId: 'client-close-1', closingAmount: 170 } as never,
         { userId: 'user-1', email: 'demo@example.com' },
       );
@@ -184,6 +190,7 @@ describe('CashRegisterService', () => {
       await expect(
         service.addMovement(
           'tenant-1',
+          'store-1',
           { type: CashMovementType.DEPOSIT, amount: 10 } as never,
           { userId: 'user-1', email: 'demo@example.com' },
         ),
@@ -193,11 +200,12 @@ describe('CashRegisterService', () => {
     it('retorna o movimento existente quando o clientId já foi processado (idempotência)', async () => {
       prisma.cashMovement.findUnique.mockResolvedValue({
         id: 'mov-1',
-        cashRegister: { tenantId: 'tenant-1' },
+        cashRegister: { storeId: 'store-1' },
       });
 
       const result = await service.addMovement(
         'tenant-1',
+        'store-1',
         {
           clientId: 'client-abc',
           type: CashMovementType.DEPOSIT,
@@ -208,7 +216,7 @@ describe('CashRegisterService', () => {
 
       expect(result).toEqual({
         id: 'mov-1',
-        cashRegister: { tenantId: 'tenant-1' },
+        cashRegister: { storeId: 'store-1' },
       });
       expect(prisma.cashRegister.findFirst).not.toHaveBeenCalled();
     });
@@ -220,6 +228,7 @@ describe('CashRegisterService', () => {
 
       const result = await service.addMovement(
         'tenant-1',
+        'store-1',
         { type: CashMovementType.WITHDRAWAL, amount: 15, reason: 'sangria' } as never,
         { userId: 'user-1', email: 'demo@example.com' },
       );

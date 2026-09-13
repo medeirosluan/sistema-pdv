@@ -174,6 +174,12 @@ async function main() {
     });
     console.log(`Tenant: ${tenant.name} (${tenant.slug})`);
 
+    const store = await prisma.store.upsert({
+      where: { tenantId_slug: { tenantId: tenant.id, slug: 'principal' } },
+      update: {},
+      create: { tenantId: tenant.id, name: 'Loja principal', slug: 'principal' },
+    });
+
     const passwordHash = await bcrypt.hash(DEMO_OWNER_PASSWORD, 10);
     const owner = await prisma.user.upsert({
       where: {
@@ -182,6 +188,7 @@ async function main() {
       update: {},
       create: {
         tenantId: tenant.id,
+        storeId: store.id,
         name: 'Proprietário Demo',
         email: DEMO_OWNER_EMAIL,
         passwordHash,
@@ -202,7 +209,7 @@ async function main() {
     console.log(`Categorias: ${CATEGORIES.length}`);
 
     for (const product of PRODUCTS) {
-      await prisma.product.upsert({
+      const savedProduct = await prisma.product.upsert({
         where: {
           tenantId_barcode: { tenantId: tenant.id, barcode: product.barcode },
         },
@@ -215,6 +222,17 @@ async function main() {
           price: product.price,
           cost: product.cost,
           unit: product.unit,
+        },
+      });
+      await prisma.productStock.upsert({
+        where: {
+          storeId_productId: { storeId: store.id, productId: savedProduct.id },
+        },
+        update: {},
+        create: {
+          tenantId: tenant.id,
+          storeId: store.id,
+          productId: savedProduct.id,
           stock: product.stock,
           minStock: product.minStock,
         },
@@ -224,11 +242,11 @@ async function main() {
 
     for (const customer of CUSTOMERS) {
       const existing = await prisma.customer.findFirst({
-        where: { tenantId: tenant.id, document: customer.document },
+        where: { storeId: store.id, document: customer.document },
       });
       if (!existing) {
         await prisma.customer.create({
-          data: { tenantId: tenant.id, ...customer },
+          data: { tenantId: tenant.id, storeId: store.id, ...customer },
         });
       }
     }

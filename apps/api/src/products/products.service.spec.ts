@@ -1,6 +1,7 @@
 import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PrismaService } from '../prisma/prisma.service.js';
+import type { StockService } from '../stock/stock.service.js';
 import type { TenantService } from '../tenant/tenant.service.js';
 import { ProductsService } from './products.service.js';
 
@@ -32,17 +33,28 @@ function planInfo(overrides: Partial<{ maxProducts: number; productsUsed: number
   };
 }
 
+function createStockServiceMock() {
+  return {
+    getStockMap: vi.fn(async () => new Map()),
+    getOrCreateStock: vi.fn(async () => ({ stock: 0, minStock: 0 })),
+    upsertInitialStock: vi.fn(async () => ({})),
+  };
+}
+
 describe('ProductsService', () => {
   let prisma: ReturnType<typeof createPrismaMock>;
   let tenantService: { getPlanInfo: ReturnType<typeof vi.fn> };
+  let stockService: ReturnType<typeof createStockServiceMock>;
   let service: ProductsService;
 
   beforeEach(() => {
     prisma = createPrismaMock();
     tenantService = { getPlanInfo: vi.fn(async () => planInfo()) };
+    stockService = createStockServiceMock();
     service = new ProductsService(
       prisma as unknown as PrismaService,
       tenantService as unknown as TenantService,
+      stockService as unknown as StockService,
     );
   });
 
@@ -51,7 +63,7 @@ describe('ProductsService', () => {
       prisma.product.findMany.mockResolvedValue([]);
       prisma.product.count.mockResolvedValue(0);
 
-      await service.list('tenant-1', { topLevelOnly: true } as never);
+      await service.list('tenant-1', 'store-1', { topLevelOnly: true } as never);
 
       expect(prisma.product.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -64,7 +76,7 @@ describe('ProductsService', () => {
       prisma.product.findMany.mockResolvedValue([]);
       prisma.product.count.mockResolvedValue(0);
 
-      await service.list('tenant-1', { parentId: 'parent-1' } as never);
+      await service.list('tenant-1', 'store-1', { parentId: 'parent-1' } as never);
 
       expect(prisma.product.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -79,7 +91,7 @@ describe('ProductsService', () => {
       prisma.product.findFirst.mockResolvedValue({ id: 'existing' });
 
       await expect(
-        service.create('tenant-1', {
+        service.create('tenant-1', 'store-1', {
           name: 'Produto X',
           price: 10,
           barcode: '123',
@@ -94,7 +106,7 @@ describe('ProductsService', () => {
       );
 
       await expect(
-        service.create('tenant-1', { name: 'Produto X', price: 10 } as never),
+        service.create('tenant-1', 'store-1', { name: 'Produto X', price: 10 } as never),
       ).rejects.toThrow(ForbiddenException);
       expect(prisma.product.create).not.toHaveBeenCalled();
     });
@@ -103,7 +115,7 @@ describe('ProductsService', () => {
       prisma.product.findFirst.mockResolvedValue(null);
       prisma.product.create.mockResolvedValue({ id: 'p1' });
 
-      await service.create('tenant-1', {
+      await service.create('tenant-1', 'store-1', {
         name: '  Produto X  ',
         price: 10,
       } as never);
@@ -113,11 +125,16 @@ describe('ProductsService', () => {
           data: expect.objectContaining({
             name: 'Produto X',
             unit: 'UN',
-            stock: 0,
-            minStock: 0,
             active: true,
           }),
         }),
+      );
+      expect(stockService.upsertInitialStock).toHaveBeenCalledWith(
+        'tenant-1',
+        'store-1',
+        'p1',
+        0,
+        0,
       );
     });
 
@@ -126,7 +143,7 @@ describe('ProductsService', () => {
       prisma.product.count.mockResolvedValue(5);
       prisma.product.create.mockResolvedValue({ id: 'p1' });
 
-      await service.create('tenant-1', {
+      await service.create('tenant-1', 'store-1', {
         name: 'Produto X',
         price: 10,
       } as never);
@@ -145,7 +162,7 @@ describe('ProductsService', () => {
       prisma.product.count.mockResolvedValue(0);
       prisma.product.create.mockResolvedValue({ id: 'p1' });
 
-      await service.create('tenant-1', {
+      await service.create('tenant-1', 'store-1', {
         name: 'Produto X',
         price: 10,
       } as never);
@@ -161,7 +178,7 @@ describe('ProductsService', () => {
       prisma.product.findFirst.mockResolvedValue(null);
       prisma.product.create.mockResolvedValue({ id: 'p1' });
 
-      await service.create('tenant-1', {
+      await service.create('tenant-1', 'store-1', {
         name: 'Produto X',
         price: 10,
         sku: 'MEU-SKU',
@@ -181,7 +198,7 @@ describe('ProductsService', () => {
       prisma.product.count.mockResolvedValue(0);
       prisma.product.create.mockResolvedValue({ id: 'p1' });
 
-      await service.create('tenant-1', {
+      await service.create('tenant-1', 'store-1', {
         name: 'Produto X',
         price: 10,
         sku: 'MEU-SKU',
@@ -201,7 +218,7 @@ describe('ProductsService', () => {
       prisma.product.count.mockResolvedValue(0);
       prisma.product.create.mockResolvedValue({ id: 'p1' });
 
-      await service.create('tenant-1', {
+      await service.create('tenant-1', 'store-1', {
         name: 'Produto X',
         price: 10,
         sku: 'MEU-SKU',
@@ -218,7 +235,7 @@ describe('ProductsService', () => {
       prisma.category.findFirst.mockResolvedValue(null);
 
       await expect(
-        service.create('tenant-1', {
+        service.create('tenant-1', 'store-1', {
           name: 'Produto X',
           price: 10,
           categoryId: 'cat-inexistente',
@@ -228,7 +245,7 @@ describe('ProductsService', () => {
 
     it('rejeita criar uma variação sem informar o nome da variação', async () => {
       await expect(
-        service.create('tenant-1', {
+        service.create('tenant-1', 'store-1', {
           name: 'Camiseta',
           price: 50,
           parentId: 'parent-1',
@@ -240,7 +257,7 @@ describe('ProductsService', () => {
       prisma.product.findFirst.mockResolvedValue(null); // ensureParent
 
       await expect(
-        service.create('tenant-1', {
+        service.create('tenant-1', 'store-1', {
           name: 'Camiseta',
           price: 50,
           parentId: 'parent-inexistente',
@@ -256,7 +273,7 @@ describe('ProductsService', () => {
       }); // ensureParent
 
       await expect(
-        service.create('tenant-1', {
+        service.create('tenant-1', 'store-1', {
           name: 'Camiseta',
           price: 50,
           parentId: 'parent-1',
@@ -272,7 +289,7 @@ describe('ProductsService', () => {
       prisma.product.count.mockResolvedValue(0);
       prisma.product.create.mockResolvedValue({ id: 'variant-1' });
 
-      await service.create('tenant-1', {
+      await service.create('tenant-1', 'store-1', {
         name: 'Camiseta',
         price: 50,
         parentId: 'parent-1',
@@ -297,7 +314,7 @@ describe('ProductsService', () => {
         .mockResolvedValueOnce({ id: 'p2' }); // ensureBarcodeAvailable finds a conflict
 
       await expect(
-        service.update('tenant-1', 'p1', { barcode: '999' } as never),
+        service.update('tenant-1', 'store-1', 'p1', { barcode: '999' } as never),
       ).rejects.toThrow(ConflictException);
     });
 
@@ -305,7 +322,7 @@ describe('ProductsService', () => {
       prisma.product.findFirst.mockResolvedValue(null);
 
       await expect(
-        service.update('tenant-1', 'inexistente', { name: 'Novo nome' } as never),
+        service.update('tenant-1', 'store-1', 'inexistente', { name: 'Novo nome' } as never),
       ).rejects.toThrow(NotFoundException);
     });
 
@@ -317,7 +334,7 @@ describe('ProductsService', () => {
       });
 
       await expect(
-        service.update('tenant-1', 'p1', {
+        service.update('tenant-1', 'store-1', 'p1', {
           parentId: 'p1',
           variantName: 'X',
         } as never),
@@ -331,7 +348,7 @@ describe('ProductsService', () => {
       prisma.product.count.mockResolvedValue(2); // p1 já tem 2 variações
 
       await expect(
-        service.update('tenant-1', 'p1', {
+        service.update('tenant-1', 'store-1', 'p1', {
           parentId: 'p2',
           variantName: 'X',
         } as never),
@@ -346,7 +363,7 @@ describe('ProductsService', () => {
       });
       prisma.product.update.mockResolvedValue({ id: 'v1' });
 
-      await service.update('tenant-1', 'v1', {
+      await service.update('tenant-1', 'store-1', 'v1', {
         variantName: '  M / Preto  ',
       } as never);
 
@@ -366,7 +383,7 @@ describe('ProductsService', () => {
       });
       prisma.product.update.mockResolvedValue({ id: 'v1' });
 
-      await service.update('tenant-1', 'v1', { parentId: null } as never);
+      await service.update('tenant-1', 'store-1', 'v1', { parentId: null } as never);
 
       expect(prisma.product.update).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -381,7 +398,7 @@ describe('ProductsService', () => {
 
   describe('importCsv', () => {
     it('rejeita CSV vazio (sem linhas de dados)', async () => {
-      await expect(service.importCsv('tenant-1', 'nome,preco\n')).rejects.toThrow(
+      await expect(service.importCsv('tenant-1', 'store-1', 'nome,preco\n')).rejects.toThrow(
         'CSV vazio ou sem linhas de dados',
       );
     });
@@ -397,7 +414,7 @@ describe('ProductsService', () => {
         'Produto OK,15.50',
       ].join('\n');
 
-      const result = await service.importCsv('tenant-1', csv);
+      const result = await service.importCsv('tenant-1', 'store-1', csv);
 
       expect(result.errors).toEqual([
         'Linha 2: nome é obrigatório',
@@ -416,7 +433,7 @@ describe('ProductsService', () => {
         'Produto Existente,20.00,789',
       ].join('\n');
 
-      const result = await service.importCsv('tenant-1', csv);
+      const result = await service.importCsv('tenant-1', 'store-1', csv);
 
       expect(prisma.product.update).toHaveBeenCalledWith(
         expect.objectContaining({ where: { id: 'existing-id' } }),
@@ -431,7 +448,7 @@ describe('ProductsService', () => {
       prisma.product.create.mockResolvedValue({ id: 'created' });
 
       const csv = ['nome,preco', 'Produto Novo,10.00'].join('\n');
-      await service.importCsv('tenant-1', csv);
+      await service.importCsv('tenant-1', 'store-1', csv);
 
       expect(prisma.product.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -451,7 +468,7 @@ describe('ProductsService', () => {
         'nome,preco,codigo_barras',
         'Produto Existente,20.00,789',
       ].join('\n');
-      await service.importCsv('tenant-1', csv);
+      await service.importCsv('tenant-1', 'store-1', csv);
 
       const updateCall = prisma.product.update.mock.calls[0][0];
       expect(updateCall.data).not.toHaveProperty('sku');
@@ -468,7 +485,7 @@ describe('ProductsService', () => {
         'nome,preco,codigo_barras,sku',
         'Produto Existente,20.00,789,SKU-NOVO',
       ].join('\n');
-      await service.importCsv('tenant-1', csv);
+      await service.importCsv('tenant-1', 'store-1', csv);
 
       expect(prisma.product.update).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -483,7 +500,7 @@ describe('ProductsService', () => {
       prisma.product.create.mockResolvedValue({ id: 'created' });
 
       const csv = ['nome,preco', 'Produto Novo,10.00'].join('\n');
-      await service.importCsv('tenant-1', csv);
+      await service.importCsv('tenant-1', 'store-1', csv);
 
       expect(prisma.product.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -500,7 +517,7 @@ describe('ProductsService', () => {
       prisma.product.update.mockResolvedValue({ id: 'existing-id' });
 
       const csv = ['nome,preco,sku', 'Produto Existente,20.00,SKU-X'].join('\n');
-      await service.importCsv('tenant-1', csv);
+      await service.importCsv('tenant-1', 'store-1', csv);
 
       const updateCall = prisma.product.update.mock.calls[0][0];
       expect(updateCall.data).not.toHaveProperty('barcode');
@@ -513,7 +530,7 @@ describe('ProductsService', () => {
       );
 
       const csv = ['nome,preco', 'Produto Novo,10.00'].join('\n');
-      const result = await service.importCsv('tenant-1', csv);
+      const result = await service.importCsv('tenant-1', 'store-1', csv);
 
       expect(result.created).toBe(0);
       expect(result.errors[0]).toContain('limite de 0 produtos');

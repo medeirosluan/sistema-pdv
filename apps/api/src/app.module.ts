@@ -18,6 +18,7 @@ import { ProductsModule } from './products/products.module.js';
 import { ReportsModule } from './reports/reports.module.js';
 import { SalesModule } from './sales/sales.module.js';
 import { StockModule } from './stock/stock.module.js';
+import { StoresModule } from './stores/stores.module.js';
 import { SubscriptionModule } from './subscription/subscription.module.js';
 import { TenantModule } from './tenant/tenant.module.js';
 import { UsersModule } from './users/users.module.js';
@@ -36,6 +37,7 @@ import { UsersModule } from './users/users.module.js';
     ReportsModule,
     UsersModule,
     StockModule,
+    StoresModule,
     TenantModule,
     AdminModule,
     AuditModule,

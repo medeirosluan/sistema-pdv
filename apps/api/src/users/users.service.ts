@@ -16,6 +16,7 @@ import {
 import { Prisma } from '../generated/prisma/client.js';
 import { UserRole } from '../generated/prisma/enums.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { StoresService } from '../stores/stores.service.js';
 import { TenantService } from '../tenant/tenant.service.js';
 import type { AuthUser } from '../auth/types/auth-user.js';
 import { CreateUserDto } from './dto/create-user.dto.js';
@@ -32,6 +33,8 @@ const userSelect = {
   permissionOverrides: true,
   createdAt: true,
   updatedAt: true,
+  storeId: true,
+  store: { select: { id: true, name: true } },
 } satisfies Prisma.UserSelect;
 
 type UserRow = Prisma.UserGetPayload<{ select: typeof userSelect }>;
@@ -53,6 +56,7 @@ export class UsersService {
     private readonly prisma: PrismaService,
     private readonly tenantService: TenantService,
     private readonly audit: AuditService,
+    private readonly storesService: StoresService,
   ) {}
 
   async list(tenantId: string, query: QueryUsersDto) {
@@ -105,6 +109,7 @@ export class UsersService {
       this.assertCanGrantPermissions(actor, dto.permissions);
     }
     await this.ensureEmailAvailable(tenantId, dto.email);
+    await this.storesService.ensureBelongsToTenant(tenantId, dto.storeId);
 
     const { limits, usage, name } =
       await this.tenantService.getPlanInfo(tenantId);
@@ -121,6 +126,7 @@ export class UsersService {
     const user = await this.prisma.user.create({
       data: {
         tenantId,
+        storeId: dto.storeId,
         name: dto.name.trim(),
         email: dto.email.toLowerCase(),
         passwordHash,
@@ -178,6 +184,10 @@ export class UsersService {
       await this.ensureEmailAvailable(tenantId, dto.email, user.id);
     }
 
+    if (dto.storeId !== undefined && dto.storeId !== user.storeId) {
+      await this.storesService.ensureBelongsToTenant(tenantId, dto.storeId);
+    }
+
     const nextRole = dto.role ?? user.role;
     const overrides =
       dto.permissions !== undefined
@@ -191,6 +201,7 @@ export class UsersService {
         ...(dto.email !== undefined && { email: dto.email.toLowerCase() }),
         ...(dto.role !== undefined && { role: dto.role }),
         ...(dto.active !== undefined && { active: dto.active }),
+        ...(dto.storeId !== undefined && { storeId: dto.storeId }),
         ...(overrides !== undefined && {
           permissionOverrides: overrides as Prisma.InputJsonValue,
         }),

@@ -77,6 +77,9 @@ export class JwtAuthGuard implements CanActivate {
             currentPeriodEnd: true,
           },
         },
+        store: {
+          select: { active: true },
+        },
       },
     });
     if (!user || !user.active) {
@@ -86,7 +89,10 @@ export class JwtAuthGuard implements CanActivate {
       throw new UnauthorizedException('Sessão encerrada');
     }
     if (user.tenant.status !== TenantStatus.ACTIVE) {
-      throw new UnauthorizedException('Loja inativa ou suspensa');
+      throw new UnauthorizedException('Empresa inativa ou suspensa');
+    }
+    if (!user.store.active) {
+      throw new UnauthorizedException('Loja inativa');
     }
 
     const url = request.originalUrl ?? request.url;
@@ -107,6 +113,7 @@ export class JwtAuthGuard implements CanActivate {
     request.user = {
       userId: user.id,
       tenantId: user.tenantId,
+      storeId: user.storeId,
       email: user.email,
       role: user.role,
       permissions: effectivePermissions(
