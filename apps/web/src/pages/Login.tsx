@@ -1,4 +1,12 @@
-import { Lock, Mail, Store } from 'lucide-react';
+import {
+  Lock,
+  Mail,
+  PackageCheck,
+  ReceiptText,
+  ShieldCheck,
+  Store,
+  WalletCards,
+} from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { ApiError } from '../lib/api';
@@ -54,32 +62,56 @@ export function Login() {
   }
 
   return (
-    <div className="flex min-h-screen">
-      <div className="hidden w-1/2 flex-col justify-between bg-slate-900 p-12 text-white lg:flex">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-500 text-lg font-bold text-slate-900">
+    <div className="flex min-h-screen bg-slate-50">
+      <div className="relative hidden w-1/2 flex-col justify-between overflow-hidden bg-slate-900 p-12 text-white lg:flex">
+        <div className="absolute -bottom-48 -right-36 h-[30rem] w-[30rem] rounded-full bg-brand-500/15" />
+        <div className="relative flex items-center gap-3">
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-400 text-lg font-bold text-slate-900">
             P
           </div>
           <span className="text-xl font-semibold">Sistema PDV</span>
         </div>
-        <div>
-          <h1 className="text-4xl font-bold leading-tight">
-            Venda mais,
+        <div className="relative max-w-md">
+          <h1 className="text-5xl font-bold leading-tight tracking-tight">
+            <span className="text-brand-300">Venda mais.</span>
             <br />
-            complique menos.
+            Gerencie com leveza.
           </h1>
-          <p className="mt-4 max-w-md text-slate-400">
-            Ponto de venda completo para o seu comércio: vendas, caixa,
-            produtos e clientes em um só lugar.
+          <p className="mt-5 max-w-md text-base leading-7 text-slate-300">
+            Seu ponto de venda completo: vendas, caixa, estoque e clientes no
+            mesmo ritmo do seu comércio.
           </p>
+          <div className="mt-7 overflow-hidden rounded-2xl border border-white/10 bg-white/5 shadow-2xl shadow-black/20">
+            <div className="flex justify-between border-b border-white/10 px-4 py-3 text-xs text-slate-300">
+              <span>Caixa principal</span>
+              <span>Hoje, 14:32</span>
+            </div>
+            <div className="grid grid-cols-[1.15fr_0.85fr]">
+              <div className="divide-y divide-white/5 px-4 py-2 text-xs text-slate-200">
+                <div className="flex justify-between py-2.5"><span>Café especial</span><span>R$ 12,00</span></div>
+                <div className="flex justify-between py-2.5"><span>Sanduíche natural</span><span>R$ 18,00</span></div>
+                <div className="flex justify-between py-2.5 text-slate-400"><span>2 itens</span><span>PIX</span></div>
+              </div>
+              <div className="flex flex-col justify-center border-l border-white/10 p-4">
+                <span className="text-xs text-slate-400">Total da venda</span>
+                <strong className="my-1 text-2xl tracking-tight">R$ 30,00</strong>
+                <span className="rounded-lg bg-brand-400 px-2 py-1.5 text-center text-xs font-bold text-slate-900">Finalizar venda</span>
+              </div>
+            </div>
+          </div>
+          <div className="mt-5 flex gap-5 text-xs text-slate-300">
+            <span className="flex items-center gap-1.5"><ReceiptText className="h-4 w-4 text-brand-300" />Vendas</span>
+            <span className="flex items-center gap-1.5"><WalletCards className="h-4 w-4 text-brand-300" />Caixa</span>
+            <span className="flex items-center gap-1.5"><PackageCheck className="h-4 w-4 text-brand-300" />Estoque</span>
+          </div>
         </div>
-        <p className="text-sm text-slate-500">
+        <p className="relative text-sm text-slate-500">
           © {new Date().getFullYear()} Sistema PDV. Todos os direitos
           reservados.
         </p>
       </div>
 
-      <div className="flex w-full items-center justify-center bg-slate-50 p-6 lg:w-1/2">
+      <div className="flex w-full items-center justify-center bg-slate-50 p-6 lg:w-1/2 lg:p-12">
         <div className="w-full max-w-sm">
           <div className="mb-8 lg:hidden">
             <div className="flex items-center gap-2">
@@ -92,9 +124,12 @@ export function Login() {
             </div>
           </div>
 
-          <h2 className="text-2xl font-semibold text-slate-900">Entrar</h2>
-          <p className="mt-1 text-sm text-slate-500">
-            Acesse o painel da sua loja.
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-100 px-3 py-1.5 text-xs font-semibold text-brand-700">
+            <ShieldCheck className="h-4 w-4" /> Acesso seguro à sua loja
+          </span>
+          <h2 className="mt-5 text-3xl font-semibold tracking-tight text-slate-900">Bem-vindo de volta</h2>
+          <p className="mt-2 text-sm text-slate-500">
+            Entre para continuar o trabalho da sua equipe.
           </p>
 
           <form onSubmit={handleSubmit} className="mt-8 space-y-4">
@@ -201,9 +236,9 @@ export function Login() {
             <button
               type="submit"
               disabled={submitting}
-              className="w-full rounded-lg bg-brand-600 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-60"
+              className="w-full rounded-xl bg-brand-600 py-3 text-sm font-semibold text-white shadow-lg shadow-brand-600/20 transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {submitting ? 'Entrando...' : 'Entrar'}
+              {submitting ? 'Entrando...' : 'Entrar no painel'}
             </button>
           </form>
 

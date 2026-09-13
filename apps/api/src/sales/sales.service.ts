@@ -159,13 +159,29 @@ export class SalesService {
       );
     }
 
+    // O valor persistido representa o que a loja efetivamente reteve. Caso
+    // haja troco, ele só pode sair de um pagamento em dinheiro.
+    const change = round2(paid - total);
+    const paymentsData = dto.payments.map((payment) => ({ ...payment }));
+    if (change > 0) {
+      const cashPayment = paymentsData.find(
+        (payment) => payment.method === 'CASH' && payment.amount >= change,
+      );
+      if (!cashPayment) {
+        throw new BadRequestException(
+          'Pagamento acima do total exige valor suficiente em dinheiro para o troco',
+        );
+      }
+      cashPayment.amount = round2(cashPayment.amount - change);
+    }
+
     return this.prisma.$transaction(async (tx) => {
-      const last = await tx.sale.findFirst({
-        where: { storeId },
-        orderBy: { number: 'desc' },
-        select: { number: true },
+      const store = await tx.store.update({
+        where: { id: storeId },
+        data: { lastSaleNumber: { increment: 1 } },
+        select: { lastSaleNumber: true },
       });
-      const number = (last?.number ?? 0) + 1;
+      const number = store.lastSaleNumber;
 
       const sale = await tx.sale.create({
         data: {
@@ -182,7 +198,7 @@ export class SalesService {
           ...(dto.createdAt ? { createdAt: new Date(dto.createdAt) } : {}),
           items: { create: itemsData },
           payments: {
-            create: dto.payments.map((payment) => ({
+            create: paymentsData.map((payment) => ({
               method: payment.method,
               amount: payment.amount,
               installments: payment.installments ?? 1,
@@ -194,7 +210,7 @@ export class SalesService {
 
       for (const item of itemsData) {
         if (item.productId) {
-          const stockRow = await this.getOrCreateStockInTx(
+          const stockRow = await this.getOrCreateLockedStockInTx(
             tx,
             tenantId,
             storeId,
@@ -252,7 +268,7 @@ export class SalesService {
       for (const item of sale.items) {
         if (item.productId) {
           const quantity = Number(item.quantity);
-          const stockRow = await this.getOrCreateStockInTx(
+          const stockRow = await this.getOrCreateLockedStockInTx(
             tx,
             sale.tenantId,
             storeId,
@@ -294,21 +310,19 @@ export class SalesService {
     });
   }
 
-  private async getOrCreateStockInTx(
+  private async getOrCreateLockedStockInTx(
     tx: Prisma.TransactionClient,
     tenantId: string,
     storeId: string,
     productId: string,
   ) {
-    const existing = await tx.productStock.findUnique({
+    const stock = await tx.productStock.upsert({
       where: { storeId_productId: { storeId, productId } },
+      update: {},
+      create: { tenantId, storeId, productId, stock: 0, minStock: 0 },
     });
-    if (existing) {
-      return existing;
-    }
-    return tx.productStock.create({
-      data: { tenantId, storeId, productId, stock: 0, minStock: 0 },
-    });
+    await tx.$queryRaw`SELECT id FROM "ProductStock" WHERE id = ${stock.id} FOR UPDATE`;
+    return tx.productStock.findUniqueOrThrow({ where: { id: stock.id } });
   }
 }
 

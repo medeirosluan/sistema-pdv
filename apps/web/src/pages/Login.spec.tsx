@@ -67,7 +67,7 @@ describe('Login', () => {
       'demo@example.com',
     )
     await user.type(screen.getByPlaceholderText('••••••••'), 'Senha123')
-    await user.click(screen.getByRole('button', { name: 'Entrar' }))
+    await user.click(screen.getByRole('button', { name: 'Entrar no painel' }))
 
     await waitFor(() => {
       expect(authState.login).toHaveBeenCalledWith(
@@ -94,7 +94,7 @@ describe('Login', () => {
       'demo@example.com',
     )
     await user.type(screen.getByPlaceholderText('••••••••'), 'errada')
-    await user.click(screen.getByRole('button', { name: 'Entrar' }))
+    await user.click(screen.getByRole('button', { name: 'Entrar no painel' }))
 
     expect(await screen.findByText('Credenciais inválidas')).toBeInTheDocument()
   })
@@ -112,7 +112,7 @@ describe('Login', () => {
       'demo@example.com',
     )
     await user.type(screen.getByPlaceholderText('••••••••'), 'Senha123')
-    await user.click(screen.getByRole('button', { name: 'Entrar' }))
+    await user.click(screen.getByRole('button', { name: 'Entrar no painel' }))
 
     expect(
       await screen.findByText('Código de verificação (2FA)'),
@@ -130,7 +130,7 @@ describe('Login', () => {
       'demo@example.com',
     )
     await user.type(screen.getByPlaceholderText('••••••••'), 'Senha123')
-    await user.click(screen.getByRole('button', { name: 'Entrar' }))
+    await user.click(screen.getByRole('button', { name: 'Entrar no painel' }))
 
     expect(
       await screen.findByText('Não foi possível entrar. Tente novamente.'),

@@ -59,17 +59,28 @@ export class CashRegisterService {
     if (existing) {
       throw new ConflictException('Já existe um caixa aberto');
     }
-    const register = await this.prisma.cashRegister.create({
-      data: {
-        tenantId,
-        storeId,
-        openedById: userId,
-        clientId: dto.clientId ?? null,
-        openingAmount: dto.openingAmount,
-        status: CashRegisterStatus.OPEN,
-      },
-      include: registerInclude,
-    });
+    let register;
+    try {
+      register = await this.prisma.cashRegister.create({
+        data: {
+          tenantId,
+          storeId,
+          openedById: userId,
+          clientId: dto.clientId ?? null,
+          openingAmount: dto.openingAmount,
+          status: CashRegisterStatus.OPEN,
+        },
+        include: registerInclude,
+      });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        throw new ConflictException('Já existe um caixa aberto');
+      }
+      throw error;
+    }
     await this.audit.log({
       tenantId,
       userId,

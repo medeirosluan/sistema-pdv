@@ -6,6 +6,9 @@ import { SalesService } from './sales.service.js';
 
 function createTxMock() {
   return {
+    store: {
+      update: vi.fn().mockResolvedValue({ lastSaleNumber: 1 }),
+    },
     sale: {
       findFirst: vi.fn().mockResolvedValue(null),
       create: vi.fn(),
@@ -13,12 +16,15 @@ function createTxMock() {
     },
     productStock: {
       findUnique: vi.fn(),
+      findUniqueOrThrow: vi.fn(),
+      upsert: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
     },
     stockMovement: {
       create: vi.fn(),
     },
+    $queryRaw: vi.fn(),
   };
 }
 
@@ -69,7 +75,8 @@ describe('SalesService', () => {
         items: [],
         payments: [],
       });
-      tx.productStock.findUnique.mockResolvedValue({ id: 'ps-1', stock: 6, minStock: 0 });
+      tx.productStock.upsert.mockResolvedValue({ id: 'ps-1', stock: 6, minStock: 0 });
+      tx.productStock.findUniqueOrThrow.mockResolvedValue({ id: 'ps-1', stock: 6, minStock: 0 });
       tx.productStock.update.mockResolvedValue({ id: 'ps-1', stock: 4 });
 
       await service.create('tenant-1', 'store-1', 'user-1', {
@@ -88,6 +95,24 @@ describe('SalesService', () => {
             previousStock: 6,
             newStock: 4,
             createdById: 'user-1',
+          }),
+        }),
+      );
+    });
+
+    it('persiste somente o valor líquido em dinheiro quando há troco', async () => {
+      prisma.product.findMany.mockResolvedValue([]);
+      tx.sale.create.mockResolvedValue({ id: 'sale-1', number: 1, items: [], payments: [] });
+
+      await service.create('tenant-1', 'store-1', 'user-1', {
+        items: [{ description: 'Item avulso', quantity: 1, unitPrice: 10 }],
+        payments: [{ method: PaymentMethod.CASH, amount: 20 }],
+      } as never);
+
+      expect(tx.sale.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            payments: { create: [expect.objectContaining({ amount: 10 })] },
           }),
         }),
       );
@@ -135,7 +160,8 @@ describe('SalesService', () => {
         items: [{ productId: 'prod-1', quantity: 3 }],
       });
       tx.sale.update.mockResolvedValue({ id: 'sale-1' });
-      tx.productStock.findUnique.mockResolvedValue({ id: 'ps-1', stock: 10, minStock: 0 });
+      tx.productStock.upsert.mockResolvedValue({ id: 'ps-1', stock: 10, minStock: 0 });
+      tx.productStock.findUniqueOrThrow.mockResolvedValue({ id: 'ps-1', stock: 10, minStock: 0 });
       tx.productStock.update.mockResolvedValue({ id: 'ps-1', stock: 13 });
 
       await service.cancel('store-1', 'sale-1', {

@@ -89,28 +89,34 @@ export class StockService {
     dto: CreateStockMovementDto,
   ) {
     await this.ensureProduct(tenantId, productId);
-    const stockRow = await this.getOrCreateStock(tenantId, storeId, productId);
-    const previous = Number(stockRow.stock);
-
-    let newStock: number;
-    if (dto.type === StockMovementType.IN) {
-      if (dto.quantity <= 0) {
-        throw new BadRequestException('Informe uma quantidade maior que zero');
-      }
-      newStock = previous + dto.quantity;
-    } else if (dto.type === StockMovementType.OUT) {
-      if (dto.quantity <= 0) {
-        throw new BadRequestException('Informe uma quantidade maior que zero');
-      }
-      newStock = previous - dto.quantity;
-      if (newStock < 0) {
-        throw new BadRequestException('Estoque insuficiente para esta saída');
-      }
-    } else {
-      newStock = dto.quantity;
+    if (
+      (dto.type === StockMovementType.IN || dto.type === StockMovementType.OUT) &&
+      dto.quantity <= 0
+    ) {
+      throw new BadRequestException('Informe uma quantidade maior que zero');
     }
 
     return this.prisma.$transaction(async (tx) => {
+      const stockRow = await this.getOrCreateLockedStockInTx(
+        tx,
+        tenantId,
+        storeId,
+        productId,
+      );
+      const previous = Number(stockRow.stock);
+
+      let newStock: number;
+      if (dto.type === StockMovementType.IN) {
+        newStock = previous + dto.quantity;
+      } else if (dto.type === StockMovementType.OUT) {
+        newStock = previous - dto.quantity;
+        if (newStock < 0) {
+          throw new BadRequestException('Estoque insuficiente para esta saída');
+        }
+      } else {
+        newStock = dto.quantity;
+      }
+
       const movement = await tx.stockMovement.create({
         data: {
           tenantId,
@@ -151,6 +157,21 @@ export class StockService {
     return this.prisma.productStock.create({
       data: { tenantId, storeId, productId, stock: 0, minStock: 0 },
     });
+  }
+
+  private async getOrCreateLockedStockInTx(
+    tx: Prisma.TransactionClient,
+    tenantId: string,
+    storeId: string,
+    productId: string,
+  ) {
+    const stock = await tx.productStock.upsert({
+      where: { storeId_productId: { storeId, productId } },
+      update: {},
+      create: { tenantId, storeId, productId, stock: 0, minStock: 0 },
+    });
+    await tx.$queryRaw`SELECT id FROM "ProductStock" WHERE id = ${stock.id} FOR UPDATE`;
+    return tx.productStock.findUniqueOrThrow({ where: { id: stock.id } });
   }
 
   async getStockMap(storeId: string, productIds: string[]) {

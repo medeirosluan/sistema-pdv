@@ -12,6 +12,8 @@ function createPrismaMock() {
     },
     productStock: {
       findUnique: vi.fn(),
+      findUniqueOrThrow: vi.fn(),
+      upsert: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
       findMany: vi.fn(),
@@ -21,6 +23,7 @@ function createPrismaMock() {
       findMany: vi.fn(),
       count: vi.fn(),
     },
+    $queryRaw: vi.fn(),
     $transaction: vi.fn(async (fn: (tx: unknown) => unknown) => fn(prisma)),
   };
   return prisma;
@@ -52,7 +55,8 @@ describe('StockService', () => {
   describe('registerMovement', () => {
     it('IN soma a quantidade ao estoque atual', async () => {
       prisma.product.findFirst.mockResolvedValue({ id: 'p1' });
-      prisma.productStock.findUnique.mockResolvedValue({ id: 'ps1', stock: 10, minStock: 0 });
+      prisma.productStock.upsert.mockResolvedValue({ id: 'ps1', stock: 10, minStock: 0 });
+      prisma.productStock.findUniqueOrThrow.mockResolvedValue({ id: 'ps1', stock: 10, minStock: 0 });
       prisma.stockMovement.create.mockResolvedValue({});
       prisma.productStock.update.mockResolvedValue({ id: 'ps1', stock: 15 });
       prisma.product.findUniqueOrThrow.mockResolvedValue({ id: 'p1' });
@@ -77,7 +81,8 @@ describe('StockService', () => {
 
     it('OUT subtrai a quantidade do estoque atual', async () => {
       prisma.product.findFirst.mockResolvedValue({ id: 'p1' });
-      prisma.productStock.findUnique.mockResolvedValue({ id: 'ps1', stock: 10, minStock: 0 });
+      prisma.productStock.upsert.mockResolvedValue({ id: 'ps1', stock: 10, minStock: 0 });
+      prisma.productStock.findUniqueOrThrow.mockResolvedValue({ id: 'ps1', stock: 10, minStock: 0 });
       prisma.stockMovement.create.mockResolvedValue({});
       prisma.productStock.update.mockResolvedValue({ id: 'ps1', stock: 4 });
       prisma.product.findUniqueOrThrow.mockResolvedValue({ id: 'p1' });
@@ -99,7 +104,8 @@ describe('StockService', () => {
 
     it('OUT rejeita quando a quantidade excede o estoque disponível', async () => {
       prisma.product.findFirst.mockResolvedValue({ id: 'p1' });
-      prisma.productStock.findUnique.mockResolvedValue({ id: 'ps1', stock: 3, minStock: 0 });
+      prisma.productStock.upsert.mockResolvedValue({ id: 'ps1', stock: 3, minStock: 0 });
+      prisma.productStock.findUniqueOrThrow.mockResolvedValue({ id: 'ps1', stock: 3, minStock: 0 });
 
       await expect(
         service.registerMovement('tenant-1', 'store-1', 'user-1', 'p1', {
@@ -112,7 +118,8 @@ describe('StockService', () => {
 
     it('ADJUST define o estoque diretamente para a quantidade informada', async () => {
       prisma.product.findFirst.mockResolvedValue({ id: 'p1' });
-      prisma.productStock.findUnique.mockResolvedValue({ id: 'ps1', stock: 10, minStock: 0 });
+      prisma.productStock.upsert.mockResolvedValue({ id: 'ps1', stock: 10, minStock: 0 });
+      prisma.productStock.findUniqueOrThrow.mockResolvedValue({ id: 'ps1', stock: 10, minStock: 0 });
       prisma.stockMovement.create.mockResolvedValue({});
       prisma.productStock.update.mockResolvedValue({ id: 'ps1', stock: 7 });
       prisma.product.findUniqueOrThrow.mockResolvedValue({ id: 'p1' });
@@ -130,6 +137,7 @@ describe('StockService', () => {
     it('rejeita quantidade zero ou negativa para IN e OUT', async () => {
       prisma.product.findFirst.mockResolvedValue({ id: 'p1' });
       prisma.productStock.findUnique.mockResolvedValue({ id: 'ps1', stock: 10, minStock: 0 });
+      prisma.productStock.findUniqueOrThrow.mockResolvedValue({ id: 'ps1', stock: 10, minStock: 0 });
 
       await expect(
         service.registerMovement('tenant-1', 'store-1', 'user-1', 'p1', {
