@@ -153,6 +153,7 @@ async function searchAndAddProduct(user: ReturnType<typeof userEvent.setup>) {
 describe('Pdv', () => {
   beforeEach(() => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
+    localStorage.clear()
     productsListMock.mockReset().mockResolvedValue({
       items: [product()],
       total: 1,
@@ -246,7 +247,28 @@ describe('Pdv', () => {
     expect(within(cartItem as HTMLElement).getByText('R$ 6,00')).toBeInTheDocument()
   })
 
-  it('remove o produto do carrinho pelo botão de lixeira', async () => {
+  it('não permite adicionar mais unidades que o estoque disponível', async () => {
+    productsListMock.mockResolvedValue({
+      items: [product({ stock: 1 })],
+      total: 1,
+      page: 1,
+      pageSize: 24,
+      totalPages: 1,
+    })
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    render(<MemoryRouter><Pdv /></MemoryRouter>)
+    await searchAndAddProduct(user)
+
+    const cartItem = screen.getAllByText('Água Mineral 500ml')[1].closest('li')
+    const plusButton = within(cartItem as HTMLElement).getAllByRole('button')[1]
+    expect(plusButton).toBeDisabled()
+
+    await user.click(screen.getAllByText('Água Mineral 500ml')[0])
+    expect(screen.getByText(/Estoque máximo atingido para Água Mineral 500ml/)).toBeInTheDocument()
+    expect(within(cartItem as HTMLElement).getByText('R$ 3,00')).toBeInTheDocument()
+  })
+
+  it('remove o produto do carrinho e permite desfazer', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
     render(<MemoryRouter><Pdv /></MemoryRouter>)
     await searchAndAddProduct(user)
@@ -256,10 +278,41 @@ describe('Pdv', () => {
     await user.click(buttons[buttons.length - 1])
 
     expect(screen.getByText('Seu carrinho está vazio')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Desfazer' }))
+    expect(screen.getAllByText('Água Mineral 500ml')).toHaveLength(2)
+  })
+
+  it('mantém a venda em espera após recarregar a tela', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    const view = render(<MemoryRouter><Pdv /></MemoryRouter>)
+    await searchAndAddProduct(user)
+
+    await user.click(screen.getByRole('button', { name: 'Colocar em espera (F7)' }))
+    expect(screen.getByRole('button', { name: '1 em espera' })).toBeInTheDocument()
+
+    view.unmount()
+    render(<MemoryRouter><Pdv /></MemoryRouter>)
+
+    expect(await screen.findByRole('button', { name: '1 em espera' })).toBeInTheDocument()
+  })
+
+  it('restaura o carrinho em andamento após recarregar a tela', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    const view = render(<MemoryRouter><Pdv /></MemoryRouter>)
+    await searchAndAddProduct(user)
+
+    view.unmount()
+    render(<MemoryRouter><Pdv /></MemoryRouter>)
+
+    expect(await screen.findByText('Água Mineral 500ml')).toBeInTheDocument()
+    expect(screen.getByText('1 item · 1 un.')).toBeInTheDocument()
   })
 
   it('desabilita finalizar quando o carrinho está vazio', () => {
     render(<MemoryRouter><Pdv /></MemoryRouter>)
+    expect(
+      screen.getByRole('button', { name: 'Definir pagamento (F8)' }),
+    ).toBeDisabled()
     expect(
       screen.getByRole('button', { name: /Finalizar venda/ }),
     ).toBeDisabled()
@@ -271,7 +324,7 @@ describe('Pdv', () => {
     render(<MemoryRouter><Pdv /></MemoryRouter>)
     await searchAndAddProduct(user)
 
-    await user.click(screen.getByRole('button', { name: /Pagamento/ }))
+    await user.click(screen.getByRole('button', { name: 'Definir pagamento (F8)' }))
     const dialog = screen.getByRole('dialog')
     const amountInput = within(dialog).getByPlaceholderText('0,00')
     await user.type(amountInput, '3')
@@ -306,7 +359,7 @@ describe('Pdv', () => {
     render(<MemoryRouter><Pdv /></MemoryRouter>)
     await searchAndAddProduct(user)
 
-    await user.click(screen.getByRole('button', { name: /Pagamento/ }))
+    await user.click(screen.getByRole('button', { name: 'Definir pagamento (F8)' }))
     const dialog = screen.getByRole('dialog')
     const amountInput = within(dialog).getByPlaceholderText('0,00')
     await user.type(amountInput, '3')

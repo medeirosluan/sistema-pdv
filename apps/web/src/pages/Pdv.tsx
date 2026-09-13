@@ -1,5 +1,7 @@
 import {
+  AlertTriangle,
   CheckCircle2,
+  Clock3,
   Keyboard,
   Lock,
   Maximize2,
@@ -10,6 +12,7 @@ import {
   Search,
   ShoppingCart,
   Trash2,
+  Undo2,
 } from 'lucide-react';
 import {
   useEffect,
@@ -54,6 +57,13 @@ interface HeldSale {
   discountInput: string;
 }
 
+interface SaleDraft {
+  cart: CartLine[];
+  customer: Customer | null;
+  discountInput: string;
+  payments: PaymentLine[];
+}
+
 function parseNumber(value: string): number {
   const parsed = Number(value.replace(',', '.'));
   return Number.isFinite(parsed) ? parsed : 0;
@@ -91,10 +101,14 @@ export function Pdv() {
   } | null>(null);
   const [multiplier, setMultiplier] = useState(1);
   const [heldSales, setHeldSales] = useState<HeldSale[]>([]);
+  const [heldSalesStorageKey, setHeldSalesStorageKey] = useState<string | null>(null);
+  const [draftStorageKey, setDraftStorageKey] = useState<string | null>(null);
   const [holdOpen, setHoldOpen] = useState(false);
   const [paymentOpen, setPaymentOpen] = useState(false);
+  const [recentlyRemoved, setRecentlyRemoved] = useState<CartLine | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const discountRef = useRef<HTMLInputElement>(null);
+  const removedLineTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // null = ainda não sabemos (carregando, ou offline sem cache) — não bloqueia
   // a venda para não travar o operador quando a checagem falha.
   const [cashOpen, setCashOpen] = useState<boolean | null>(null);
@@ -113,6 +127,89 @@ export function Pdv() {
       active = false;
     };
   }, []);
+
+  useEffect(() => () => {
+    if (removedLineTimer.current) {
+      clearTimeout(removedLineTimer.current);
+    }
+  }, []);
+
+  const heldSalesKey = user?.tenant.id
+    ? `pdv.heldSales.${user.tenant.id}`
+    : null;
+  const saleDraftKey = user?.tenant.id
+    ? `pdv.saleDraft.${user.tenant.id}`
+    : null;
+
+  useEffect(() => {
+    if (!heldSalesKey) {
+      setHeldSales([]);
+      setHeldSalesStorageKey(null);
+      return;
+    }
+
+    try {
+      const stored = localStorage.getItem(heldSalesKey);
+      const parsed: unknown = stored ? JSON.parse(stored) : [];
+      setHeldSales(Array.isArray(parsed) ? parsed as HeldSale[] : []);
+    } catch {
+      setHeldSales([]);
+    }
+    setHeldSalesStorageKey(heldSalesKey);
+  }, [heldSalesKey]);
+
+  useEffect(() => {
+    if (!heldSalesKey || heldSalesStorageKey !== heldSalesKey) {
+      return;
+    }
+    if (heldSales.length === 0) {
+      localStorage.removeItem(heldSalesKey);
+      return;
+    }
+    localStorage.setItem(heldSalesKey, JSON.stringify(heldSales));
+  }, [heldSales, heldSalesKey, heldSalesStorageKey]);
+
+  useEffect(() => {
+    if (!saleDraftKey) {
+      setDraftStorageKey(null);
+      return;
+    }
+
+    try {
+      const stored = localStorage.getItem(saleDraftKey);
+      const parsed: unknown = stored ? JSON.parse(stored) : null;
+      if (
+        parsed &&
+        typeof parsed === 'object' &&
+        Array.isArray((parsed as SaleDraft).cart)
+      ) {
+        const draft = parsed as SaleDraft;
+        setCart(draft.cart);
+        setCustomer(draft.customer ?? null);
+        setDiscountInput(draft.discountInput ?? '');
+        setPayments(
+          Array.isArray(draft.payments) && draft.payments.length > 0
+            ? draft.payments
+            : [newPaymentLine()],
+        );
+      }
+    } catch {
+      localStorage.removeItem(saleDraftKey);
+    }
+    setDraftStorageKey(saleDraftKey);
+  }, [saleDraftKey]);
+
+  useEffect(() => {
+    if (!saleDraftKey || draftStorageKey !== saleDraftKey) {
+      return;
+    }
+    if (cart.length === 0) {
+      localStorage.removeItem(saleDraftKey);
+      return;
+    }
+    const draft: SaleDraft = { cart, customer, discountInput, payments };
+    localStorage.setItem(saleDraftKey, JSON.stringify(draft));
+  }, [cart, customer, discountInput, payments, saleDraftKey, draftStorageKey]);
 
   useEffect(() => {
     const timeout = setTimeout(() => setDebounced(search.trim()), 300);
@@ -198,17 +295,34 @@ export function Pdv() {
 
   function addToCart(product: Product, quantity = multiplier) {
     setLastSale(null);
-    setError(null);
+    const stock = Math.max(0, Number(product.stock));
+    const currentQuantity = cart.find(
+      (line) => line.product.id === product.id,
+    )?.quantity ?? 0;
+    const available = stock - currentQuantity;
+    if (available <= 0) {
+      setError(
+        `Estoque máximo atingido para ${productDisplayName(product)} (${stock} ${product.unit}).`,
+      );
+      return;
+    }
+
+    const quantityToAdd = Math.min(quantity, available);
+    setError(
+      quantityToAdd < quantity
+        ? `Foram adicionadas apenas ${quantityToAdd} ${product.unit}: estoque disponível atingido.`
+        : null,
+    );
     setCart((prev) => {
       const existing = prev.find((line) => line.product.id === product.id);
       if (existing) {
         return prev.map((line) =>
           line.product.id === product.id
-            ? { ...line, quantity: line.quantity + quantity }
+            ? { ...line, quantity: line.quantity + quantityToAdd }
             : line,
         );
       }
-      return [...prev, { product, quantity }];
+      return [...prev, { product, quantity: quantityToAdd }];
     });
     setMultiplier(1);
     setLastAddedId(product.id);
@@ -294,6 +408,18 @@ export function Pdv() {
   }
 
   function changeQuantity(productId: string, delta: number) {
+    const line = cart.find((item) => item.product.id === productId);
+    if (
+      line &&
+      delta > 0 &&
+      line.quantity >= Math.max(0, Number(line.product.stock))
+    ) {
+      setError(
+        `Estoque máximo atingido para ${productDisplayName(line.product)} (${Number(line.product.stock)} ${line.product.unit}).`,
+      );
+      return;
+    }
+    setError(null);
     setCart((prev) =>
       prev
         .map((line) =>
@@ -306,8 +432,43 @@ export function Pdv() {
   }
 
   function removeLine(productId: string) {
+    const removed = cart.find((line) => line.product.id === productId);
+    if (removed) {
+      setRecentlyRemoved(removed);
+      if (removedLineTimer.current) {
+        clearTimeout(removedLineTimer.current);
+      }
+      removedLineTimer.current = setTimeout(() => {
+        setRecentlyRemoved(null);
+        removedLineTimer.current = null;
+      }, 6000);
+    }
     setCart((prev) => prev.filter((line) => line.product.id !== productId));
     setSelectedLineId((prev) => (prev === productId ? null : prev));
+  }
+
+  function undoRemoveLine() {
+    if (!recentlyRemoved) {
+      return;
+    }
+    const restored = recentlyRemoved;
+    setCart((prev) => {
+      const existing = prev.find((line) => line.product.id === restored.product.id);
+      if (existing) {
+        return prev.map((line) =>
+          line.product.id === restored.product.id
+            ? { ...line, quantity: line.quantity + restored.quantity }
+            : line,
+        );
+      }
+      return [...prev, restored];
+    });
+    setSelectedLineId(restored.product.id);
+    setRecentlyRemoved(null);
+    if (removedLineTimer.current) {
+      clearTimeout(removedLineTimer.current);
+      removedLineTimer.current = null;
+    }
   }
 
   function moveCartSelection(delta: number) {
@@ -757,6 +918,16 @@ export function Pdv() {
           <div className="flex items-center gap-2 border-b border-slate-100 px-5 py-4">
             <ShoppingCart className="h-5 w-5 text-brand-600" />
             <h2 className="text-base font-semibold text-slate-900">Carrinho</h2>
+            {cart.length > 0 && (
+              <button
+                type="button"
+                onClick={holdSale}
+                className="inline-flex items-center gap-1 rounded-lg border border-amber-200 bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-800 transition hover:bg-amber-100"
+              >
+                <Clock3 className="h-3.5 w-3.5" />
+                Colocar em espera (F7)
+              </button>
+            )}
             {heldSales.length > 0 && (
               <button
                 type="button"
@@ -816,6 +987,9 @@ export function Pdv() {
               <ul className="divide-y divide-slate-100 px-5">
                 {cart.map((line) => {
                   const selected = line.product.id === selectedLineId;
+                  const stock = Number(line.product.stock);
+                  const lowStock = stock > 0 && stock <= Number(line.product.minStock);
+                  const stockLimitReached = line.quantity >= stock;
                   return (
                     <li
                       key={line.product.id}
@@ -834,6 +1008,12 @@ export function Pdv() {
                       <p className="text-xs text-slate-400">
                         {line.product.unit} · {formatBRL(line.product.price)} cada
                       </p>
+                      {lowStock && (
+                        <p className="mt-1 flex items-center gap-1 text-xs font-medium text-amber-700">
+                          <AlertTriangle className="h-3 w-3" />
+                          Estoque baixo: {stock} {line.product.unit}
+                        </p>
+                      )}
                     </div>
                     <div className="flex items-center gap-1">
                       <button
@@ -849,7 +1029,9 @@ export function Pdv() {
                       <button
                         type="button"
                         onClick={() => changeQuantity(line.product.id, 1)}
-                        className="rounded-r-lg border border-slate-200 p-1.5 text-brand-600 transition hover:bg-brand-50"
+                        disabled={stockLimitReached}
+                        title={stockLimitReached ? 'Estoque máximo atingido' : 'Adicionar uma unidade'}
+                        className="rounded-r-lg border border-slate-200 p-1.5 text-brand-600 transition hover:bg-brand-50 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-300"
                       >
                         <Plus className="h-3.5 w-3.5" />
                       </button>
@@ -871,7 +1053,21 @@ export function Pdv() {
             )}
           </div>
 
-          <div className="space-y-3 border-t border-slate-200 px-5 py-4">
+          {recentlyRemoved && (
+            <div className="mx-5 mb-1 flex items-center justify-between gap-3 rounded-xl border border-brand-100 bg-brand-50 px-3 py-2 text-sm text-brand-800">
+              <span className="truncate">{productDisplayName(recentlyRemoved.product)} removido</span>
+              <button
+                type="button"
+                onClick={undoRemoveLine}
+                className="inline-flex shrink-0 items-center gap-1 font-semibold text-brand-700 hover:text-brand-900"
+              >
+                <Undo2 className="h-3.5 w-3.5" />
+                Desfazer
+              </button>
+            </div>
+          )}
+
+          <div className="max-lg:sticky max-lg:bottom-2 max-lg:z-10 max-lg:mx-2 max-lg:rounded-2xl max-lg:border max-lg:border-slate-200 max-lg:bg-white max-lg:shadow-xl max-lg:shadow-slate-900/10 space-y-3 border-t border-slate-200 bg-white px-5 py-4">
             <CustomerPicker value={customer} onChange={setCustomer} />
             <div className="flex items-center justify-between text-sm">
               <span className="text-slate-500">Subtotal</span>
@@ -900,9 +1096,10 @@ export function Pdv() {
             <button
               type="button"
               onClick={() => setPaymentOpen(true)}
-              className="w-full rounded-xl border border-slate-300 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+              disabled={cart.length === 0}
+              className="w-full rounded-xl border border-slate-300 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Pagamento (F8)
+              Definir pagamento (F8)
             </button>
 
             <div className="space-y-1 rounded-xl bg-slate-50 px-3 py-2 text-sm">
@@ -934,16 +1131,6 @@ export function Pdv() {
               <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
                 {error}
               </p>
-            )}
-
-            {cart.length > 0 && (
-              <button
-                type="button"
-                onClick={holdSale}
-                className="w-full rounded-lg border border-slate-300 py-2 text-xs font-medium text-slate-600 transition hover:bg-slate-50"
-              >
-                Suspender venda (F7)
-              </button>
             )}
 
             <button
@@ -988,7 +1175,7 @@ export function Pdv() {
             ['F6', 'Cancelar/limpar a venda'],
             ['F7', 'Suspender/retomar venda'],
             ['Delete', 'Remover o item selecionado'],
-            ['F8', 'Abrir o pagamento (escolha 1-4 e o valor)'],
+            ['F8', 'Definir o pagamento (escolha 1-4 e o valor)'],
             ['F9', 'Finalizar a venda'],
             ['F10', 'Tela cheia (kiosk)'],
             ['Ctrl+P', 'Reimprimir o último cupom'],
