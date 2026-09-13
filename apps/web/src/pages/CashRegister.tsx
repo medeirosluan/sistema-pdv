@@ -360,7 +360,9 @@ export function CashRegister() {
                 className={`text-lg font-semibold ${
                   closeResult.difference === 0
                     ? 'text-slate-900'
-                    : 'text-red-600'
+                    : closeResult.difference > 0
+                      ? 'text-emerald-600'
+                      : 'text-red-600'
                 }`}
               >
                 {formatBRL(closeResult.difference)}
@@ -670,6 +672,36 @@ function CashOpenPanel({
         <div className="rounded-2xl border border-slate-200 bg-white p-6">
           <h3 className="text-sm font-semibold text-slate-900">Fechar caixa</h3>
           <form onSubmit={onClose} className="mt-4 space-y-3">
+            <div className="rounded-xl bg-slate-50 p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Composição do valor esperado
+              </p>
+              <div className="mt-2 space-y-1.5 text-sm">
+                <div className="flex justify-between text-slate-600">
+                  <span>Valor de abertura</span>
+                  <span>{formatBRL(register.openingAmount)}</span>
+                </div>
+                <div className="flex justify-between text-slate-600">
+                  <span>Vendas em dinheiro</span>
+                  <span className="text-emerald-700">+ {formatBRL(summary.byMethod.CASH)}</span>
+                </div>
+                <div className="flex justify-between text-slate-600">
+                  <span>Suprimentos</span>
+                  <span className="text-emerald-700">+ {formatBRL(summary.deposits)}</span>
+                </div>
+                <div className="flex justify-between text-slate-600">
+                  <span>Sangrias</span>
+                  <span className="text-red-600">− {formatBRL(summary.withdrawals)}</span>
+                </div>
+                <div className="flex justify-between border-t border-slate-200 pt-2 font-semibold text-slate-900">
+                  <span>Esperado na gaveta</span>
+                  <span>{formatBRL(summary.expectedCash)}</span>
+                </div>
+              </div>
+              <p className="mt-2 text-xs text-slate-400">
+                PIX, crédito e débito não entram no dinheiro físico da gaveta.
+              </p>
+            </div>
             <div>
               <span className="mb-1.5 block text-sm text-slate-500">
                 Valor esperado na gaveta
@@ -691,7 +723,11 @@ function CashOpenPanel({
                 <span className="text-slate-500">Diferença</span>
                 <span
                   className={`font-semibold ${
-                    difference === 0 ? 'text-slate-900' : 'text-red-600'
+                    difference === 0
+                      ? 'text-slate-900'
+                      : difference > 0
+                        ? 'text-emerald-600'
+                        : 'text-red-600'
                   }`}
                 >
                   {formatBRL(difference)}

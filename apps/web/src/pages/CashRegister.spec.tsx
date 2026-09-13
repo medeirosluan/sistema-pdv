@@ -266,6 +266,28 @@ describe('CashRegister', () => {
     expect(screen.getByText('-R$ 10,00')).toBeInTheDocument()
   })
 
+  it('explica a composição do valor esperado antes de fechar', async () => {
+    cashCurrentMock.mockResolvedValue(openRegister())
+    render(<CashRegister />)
+    await screen.findByText('Caixa aberto')
+
+    expect(screen.getByText('Composição do valor esperado')).toBeInTheDocument()
+    expect(screen.getByText('Valor de abertura')).toBeInTheDocument()
+    expect(screen.getByText('Vendas em dinheiro')).toBeInTheDocument()
+    expect(screen.getByText('PIX, crédito e débito não entram no dinheiro físico da gaveta.')).toBeInTheDocument()
+  })
+
+  it('mostra em verde a sobra no fechamento', async () => {
+    const user = userEvent.setup()
+    cashCurrentMock.mockResolvedValue(openRegister())
+    render(<CashRegister />)
+    await screen.findByText('Caixa aberto')
+
+    await user.type(screen.getByPlaceholderText('Valor contado'), '260')
+
+    expect(screen.getByText('R$ 10,00')).toHaveClass('text-emerald-600')
+  })
+
   it('fecha o caixa após confirmação e mostra o resultado', async () => {
     const user = userEvent.setup()
     const closeResult: CloseResult = {
