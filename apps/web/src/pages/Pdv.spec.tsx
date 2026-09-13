@@ -311,9 +311,6 @@ describe('Pdv', () => {
   it('desabilita finalizar quando o carrinho está vazio', () => {
     render(<MemoryRouter><Pdv /></MemoryRouter>)
     expect(
-      screen.getByRole('button', { name: 'Definir pagamento (F8)' }),
-    ).toBeDisabled()
-    expect(
       screen.getByRole('button', { name: /Finalizar venda/ }),
     ).toBeDisabled()
   })
@@ -324,7 +321,7 @@ describe('Pdv', () => {
     render(<MemoryRouter><Pdv /></MemoryRouter>)
     await searchAndAddProduct(user)
 
-    await user.click(screen.getByRole('button', { name: 'Definir pagamento (F8)' }))
+    await user.click(screen.getByRole('button', { name: /Finalizar venda/ }))
     const dialog = screen.getByRole('dialog')
     const amountInput = within(dialog).getByPlaceholderText('0,00')
     await user.type(amountInput, '3')
@@ -359,7 +356,7 @@ describe('Pdv', () => {
     render(<MemoryRouter><Pdv /></MemoryRouter>)
     await searchAndAddProduct(user)
 
-    await user.click(screen.getByRole('button', { name: 'Definir pagamento (F8)' }))
+    await user.click(screen.getByRole('button', { name: /Finalizar venda/ }))
     const dialog = screen.getByRole('dialog')
     const amountInput = within(dialog).getByPlaceholderText('0,00')
     await user.type(amountInput, '3')

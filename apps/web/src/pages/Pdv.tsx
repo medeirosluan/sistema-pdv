@@ -702,6 +702,17 @@ export function Pdv() {
     }
   }
 
+  function handleFinalizeAction() {
+    if (cart.length === 0 || cashOpen === false) {
+      return;
+    }
+    if (remaining > 0) {
+      setPaymentOpen(true);
+      return;
+    }
+    void finalize();
+  }
+
   function receiptOptions() {
     const tenant = user?.tenant;
     return {
@@ -751,7 +762,7 @@ export function Pdv() {
     },
     F9: (event) => {
       event.preventDefault();
-      void finalize();
+      handleFinalizeAction();
     },
     F10: (event) => {
       event.preventDefault();
@@ -1093,15 +1104,6 @@ export function Pdv() {
               </span>
             </div>
 
-            <button
-              type="button"
-              onClick={() => setPaymentOpen(true)}
-              disabled={cart.length === 0}
-              className="w-full rounded-xl border border-slate-300 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Definir pagamento (F8)
-            </button>
-
             <div className="space-y-1 rounded-xl bg-slate-50 px-3 py-2 text-sm">
               <div className="flex justify-between">
                 <span className="text-slate-500">Pago</span>
@@ -1135,12 +1137,11 @@ export function Pdv() {
 
             <button
               type="button"
-              onClick={finalize}
+              onClick={handleFinalizeAction}
               disabled={
                 cart.length === 0 ||
                 submitting ||
-                cashOpen === false ||
-                (total > 0 && remaining > 0)
+                cashOpen === false
               }
               className="w-full rounded-xl bg-brand-600 py-3.5 text-sm font-semibold text-white shadow-lg shadow-brand-600/20 transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
             >

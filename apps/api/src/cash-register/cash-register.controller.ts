@@ -14,6 +14,7 @@ export class CashRegisterController {
   constructor(private readonly cashRegisterService: CashRegisterService) {}
 
   @Get()
+  @RequirePermission('cash.history')
   history(
     @CurrentUser() user: AuthUser,
     @Query() query: QueryCashRegisterDto,

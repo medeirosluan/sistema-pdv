@@ -16,6 +16,8 @@ describe('permissions', () => {
     const permissions = effectivePermissions('CASHIER', null);
     expect(permissions).toContain('sales.create');
     expect(permissions).toContain('cash.operate');
+    expect(permissions).not.toContain('cash.history');
+    expect(permissions).not.toContain('reports.view');
     expect(permissions).not.toContain('products.manage');
   });
 
@@ -26,20 +28,12 @@ describe('permissions', () => {
     expect(permissions).toContain('sales.cancel');
   });
 
-  it('deny remove permissão do papel', () => {
-    const permissions = effectivePermissions('CASHIER', {
-      deny: ['reports.view'],
-    });
-    expect(permissions).not.toContain('reports.view');
-  });
-
   it('computeOverrides gera grant e deny a partir do desejado', () => {
     const overrides = computeOverrides('CASHIER', [
       'sales.create',
       'sales.cancel',
     ]);
     expect(overrides.grant).toContain('sales.cancel');
-    expect(overrides.deny).toContain('reports.view');
     expect(overrides.deny).toContain('cash.operate');
   });
 

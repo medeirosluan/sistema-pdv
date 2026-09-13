@@ -12,6 +12,7 @@ export type Permission =
   | 'customers.manage'
   | 'stock.manage'
   | 'cash.operate'
+  | 'cash.history'
   | 'users.manage'
   | 'owners.manage'
   | 'settings.manage'
@@ -41,7 +42,7 @@ export const PERMISSIONS: PermissionDef[] = [
     key: 'reports.view',
     label: 'Ver relatórios e dashboard',
     group: 'Vendas',
-    roles: ['OWNER', 'MANAGER', 'CASHIER'],
+    roles: ['OWNER', 'MANAGER'],
   },
   {
     key: 'products.view',
@@ -84,6 +85,12 @@ export const PERMISSIONS: PermissionDef[] = [
     label: 'Operar o caixa (abrir/fechar/sangria)',
     group: 'Operação',
     roles: ['OWNER', 'MANAGER', 'CASHIER'],
+  },
+  {
+    key: 'cash.history',
+    label: 'Ver histórico de caixas',
+    group: 'Operação',
+    roles: ['OWNER', 'MANAGER'],
   },
   {
     key: 'users.manage',

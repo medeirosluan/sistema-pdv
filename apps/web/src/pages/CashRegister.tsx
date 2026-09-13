@@ -14,6 +14,7 @@ import {
 } from 'react';
 import { ApiError } from '../lib/api';
 import { useAuth } from '../lib/useAuth';
+import { useCan } from '../lib/permissions';
 import { useConfirm } from '../components/ui/useConfirm';
 import { useToast } from '../components/ui/useToast';
 import {
@@ -126,6 +127,8 @@ async function withPendingCashSession(
 
 export function CashRegister() {
   const { user } = useAuth();
+  const can = useCan();
+  const canViewHistory = can('cash.history');
   const confirm = useConfirm();
   const toast = useToast();
   const [current, setCurrent] = useState<CurrentCashRegister | null>(null);
@@ -165,13 +168,17 @@ export function CashRegister() {
   }, [user]);
 
   const loadHistory = useCallback(async () => {
+    if (!canViewHistory) {
+      setHistory([]);
+      return;
+    }
     try {
       const data = await cashApi.history(1, 10);
       setHistory(data.items);
     } catch {
       // histórico é auxiliar
     }
-  }, []);
+  }, [canViewHistory]);
 
   useEffect(() => {
     void (async () => {
@@ -429,7 +436,7 @@ export function CashRegister() {
         />
       )}
 
-      <div>
+      {canViewHistory && <div>
         <h3 className="mb-3 text-sm font-semibold text-slate-900">
           Histórico de caixas
         </h3>
@@ -488,7 +495,7 @@ export function CashRegister() {
             </tbody>
           </table>
         </div>
-      </div>
+      </div>}
     </div>
   );
 }

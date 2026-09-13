@@ -24,6 +24,8 @@ describe('rolePermissions', () => {
     const cashierPermissions = rolePermissions('CASHIER')
     expect(cashierPermissions).toContain('sales.create')
     expect(cashierPermissions).toContain('cash.operate')
+    expect(cashierPermissions).not.toContain('cash.history')
+    expect(cashierPermissions).not.toContain('reports.view')
     expect(cashierPermissions).not.toContain('products.manage')
   })
 

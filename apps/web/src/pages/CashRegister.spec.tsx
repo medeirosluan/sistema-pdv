@@ -7,7 +7,7 @@ import type { PendingCashClose, PendingCashOpen } from '../lib/offline/cashQueue
 import { CashRegister } from './CashRegister'
 
 const authState = vi.hoisted(() => ({
-  user: { tenant: { id: 'tenant-1' } },
+  user: { tenant: { id: 'tenant-1' }, permissions: ['cash.history'] },
 }))
 
 const cashCurrentMock = vi.hoisted(() => vi.fn())
@@ -102,7 +102,7 @@ function openRegister(
 
 describe('CashRegister', () => {
   beforeEach(() => {
-    authState.user = { tenant: { id: 'tenant-1' } }
+    authState.user = { tenant: { id: 'tenant-1' }, permissions: ['cash.history'] }
     cashCurrentMock.mockReset()
     cashOpenMock.mockReset()
     cashCloseMock.mockReset()
@@ -388,6 +388,16 @@ describe('CashRegister', () => {
     render(<CashRegister />)
 
     expect(await screen.findByText('Fechado')).toBeInTheDocument()
+  })
+
+  it('não carrega nem exibe o histórico sem a permissão específica', async () => {
+    authState.user = { tenant: { id: 'tenant-1' }, permissions: [] }
+    cashCurrentMock.mockResolvedValue(null)
+    render(<CashRegister />)
+
+    await screen.findByText('Caixa fechado')
+    expect(screen.queryByText('Histórico de caixas')).not.toBeInTheDocument()
+    expect(cashHistoryMock).not.toHaveBeenCalled()
   })
 
   it('recarrega o resumo quando uma sincronização em segundo plano altera a fila pendente', async () => {
